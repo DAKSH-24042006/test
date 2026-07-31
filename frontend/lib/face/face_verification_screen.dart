@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +9,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:smart_attendance/core/providers/face_provider.dart';
 import 'package:smart_attendance/core/providers/student_provider.dart';
 import 'package:smart_attendance/core/theme/app_theme.dart';
+import 'package:smart_attendance/core/utils/camera_helper.dart';
 import 'package:smart_attendance/core/widgets/oval_guide_painter.dart';
 
 class FaceVerificationScreen extends ConsumerStatefulWidget {
@@ -271,29 +271,8 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       _cameraController = null;
     }
     _faceDetector?.close();
-    
     if (kIsWeb) {
-      try {
-        js.context.callMethod('eval', [
-          """
-          (function() {
-            document.querySelectorAll('video').forEach(function(video) {
-              if (video.srcObject) {
-                var stream = video.srcObject;
-                if (typeof stream.getTracks === 'function') {
-                  stream.getTracks().forEach(function(track) {
-                    track.stop();
-                  });
-                }
-                video.srcObject = null;
-              }
-            });
-          })();
-          """
-        ]);
-      } catch (e) {
-        debugPrint('Web browser webcam force-kill error: $e');
-      }
+      forceStopWebcamStreams();
     }
     
     if (mounted) {
