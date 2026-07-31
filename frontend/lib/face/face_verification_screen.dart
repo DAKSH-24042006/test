@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -203,14 +204,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       final image = await _cameraController!.takePicture();
       final bytes = await image.readAsBytes();
       
-      // Stop and dispose the camera stream as soon as capture finishes to free resource
-      if (_cameraController != null) {
-        await _cameraController!.dispose();
-        _cameraController = null;
-        setState(() {
-          _isCameraInitialized = false;
-        });
-      }
+      await _safeExit();
       
       _submitVerifyBytes(bytes);
     } catch (e) {
@@ -223,13 +217,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
 
   void _simulateVerify() async {
     final validBytes = base64Decode(_mockJpegBase64);
-    if (_cameraController != null) {
-      await _cameraController!.dispose();
-      _cameraController = null;
-      setState(() {
-        _isCameraInitialized = false;
-      });
-    }
+    await _safeExit();
     _submitVerifyBytes(validBytes);
   }
 
@@ -275,16 +263,49 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
 
   Future<void> _safeExit() async {
     if (_cameraController != null) {
-      await _cameraController!.dispose();
+      try {
+        await _cameraController!.dispose();
+      } catch (e) {
+        debugPrint('Controller dispose error: $e');
+      }
       _cameraController = null;
     }
     _faceDetector?.close();
+    
+    if (kIsWeb) {
+      try {
+        js.context.callMethod('eval', [
+          """
+          (function() {
+            document.querySelectorAll('video').forEach(function(video) {
+              if (video.srcObject) {
+                var stream = video.srcObject;
+                if (typeof stream.getTracks === 'function') {
+                  stream.getTracks().forEach(function(track) {
+                    track.stop();
+                  });
+                }
+                video.srcObject = null;
+              }
+            });
+          })();
+          """
+        ]);
+      } catch (e) {
+        debugPrint('Web browser webcam force-kill error: $e');
+      }
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
   }
 
   @override
   void dispose() {
-    _cameraController?.dispose();
-    _faceDetector?.close();
+    _safeExit();
     super.dispose();
   }
 
@@ -325,13 +346,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
               value: _simulatorMode,
               onChanged: (val) async {
                 if (val) {
-                  if (_cameraController != null) {
-                    await _cameraController!.dispose();
-                    _cameraController = null;
-                    setState(() {
-                      _isCameraInitialized = false;
-                    });
-                  }
+                  await _safeExit();
                 }
                 setState(() {
                   _simulatorMode = val;
