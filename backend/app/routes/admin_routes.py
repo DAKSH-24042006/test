@@ -71,20 +71,19 @@ class StudentResponse(BaseModel):
 
 # === CLASSES ENDPOINTS ===
 
-@router.post("/classes", response_model=ClassResponse)
+# === CLASSES ENDPOINTS ===
+
 @router.post("/admin/classes", response_model=ClassResponse)
 async def create_class(class_data: ClassCreate, current_admin: dict = Depends(get_current_user)):
     res = await class_repo.create(class_data.dict())
     return ClassResponse(**res)
 
-@router.get("/classes", response_model=List[ClassResponse])
 @router.get("/admin/classes", response_model=List[ClassResponse])
 async def get_classes(current_user: dict = Depends(get_current_user)):
     # Note: Accessible by admin. Also accessible by student (handled in student router, but registered here for alias)
     classes = await class_repo.list_all()
     return [ClassResponse(**c) for c in classes]
 
-@router.get("/classes/{class_id}", response_model=ClassResponse)
 @router.get("/admin/classes/{class_id}", response_model=ClassResponse)
 async def get_class(class_id: str, current_user: dict = Depends(get_current_user)):
     clazz = await class_repo.get_by_id(class_id)
@@ -92,7 +91,6 @@ async def get_class(class_id: str, current_user: dict = Depends(get_current_user
         raise HTTPException(status_code=404, detail="Class not found")
     return ClassResponse(**clazz)
 
-@router.put("/classes/{class_id}", response_model=ClassResponse)
 @router.put("/admin/classes/{class_id}", response_model=ClassResponse)
 async def update_class(class_id: str, update_data: ClassUpdate, current_admin: dict = Depends(get_current_user)):
     res = await class_repo.update(class_id, update_data.dict(exclude_unset=True))
@@ -102,7 +100,6 @@ async def update_class(class_id: str, update_data: ClassUpdate, current_admin: d
     ClassCacheManager.invalidate_class(class_id)
     return ClassResponse(**res)
 
-@router.delete("/classes/{class_id}")
 @router.delete("/admin/classes/{class_id}")
 async def delete_class(class_id: str, current_admin: dict = Depends(get_current_user)):
     clazz = await class_repo.get_by_id(class_id)
@@ -127,7 +124,6 @@ async def delete_class(class_id: str, current_admin: dict = Depends(get_current_
 
 # === STUDENTS ENDPOINTS ===
 
-@router.post("/students", response_model=StudentResponse)
 @router.post("/admin/students", response_model=StudentResponse)
 async def create_student(student_data: StudentCreate, current_admin: dict = Depends(get_current_user)):
     # Verify class exists
@@ -146,7 +142,6 @@ async def create_student(student_data: StudentCreate, current_admin: dict = Depe
     
     return StudentResponse(**res)
 
-@router.get("/students", response_model=List[StudentResponse])
 @router.get("/admin/students", response_model=List[StudentResponse])
 async def get_students(class_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     if class_id:
@@ -162,7 +157,6 @@ async def get_students(class_id: Optional[str] = None, current_user: dict = Depe
         res.append(StudentResponse(**s_dict))
     return res
 
-@router.put("/students/{student_id}", response_model=StudentResponse)
 @router.put("/admin/students/{student_id}", response_model=StudentResponse)
 async def update_student(student_id: str, update_data: StudentUpdate, current_admin: dict = Depends(get_current_user)):
     student = await student_repo.get_by_id(student_id)
@@ -191,7 +185,6 @@ async def update_student(student_id: str, update_data: StudentUpdate, current_ad
     res_dict["is_registered"] = len(emb_docs) > 0
     return StudentResponse(**res_dict)
 
-@router.delete("/students/{student_id}")
 @router.delete("/admin/students/{student_id}")
 async def delete_student(student_id: str, current_admin: dict = Depends(get_current_user)):
     student = await student_repo.get_by_id(student_id)
