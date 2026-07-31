@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +31,16 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
   String _instructionMessage = 'Align your face inside the oval';
   Color _ovalColor = Colors.white;
 
+  // A valid base64 encoded 100x100 gray JPEG image to satisfy backend decoders during mock simulation tests
+  static const String _mockJpegBase64 = 
+      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCABkAGQBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+
   @override
   void initState() {
     super.initState();
-    _initDetector();
+    if (!kIsWeb) {
+      _initDetector();
+    }
     _initCamera();
   }
 
@@ -73,7 +80,9 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
         _isCameraError = false;
       });
 
-      _startDetectionStream();
+      if (!kIsWeb) {
+        _startDetectionStream();
+      }
     } catch (e) {
       debugPrint('Verification camera error: $e');
       setState(() {
@@ -188,22 +197,27 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
 
   Future<void> _captureAndVerify() async {
     if (_cameraController == null) return;
-    await _cameraController!.stopImageStream();
-
+    
     try {
+      if (!kIsWeb) {
+        await _cameraController!.stopImageStream();
+      }
+      
       final image = await _cameraController!.takePicture();
       final bytes = await image.readAsBytes();
       
       _submitVerifyBytes(bytes);
     } catch (e) {
       debugPrint('Shutter error: $e');
-      _startDetectionStream();
+      if (!kIsWeb) {
+        _startDetectionStream();
+      }
     }
   }
 
   void _simulateVerify() {
-    final dummyBytes = List<int>.generate(100, (i) => i);
-    _submitVerifyBytes(dummyBytes);
+    final validBytes = base64Decode(_mockJpegBase64);
+    _submitVerifyBytes(validBytes);
   }
 
   void _submitVerifyBytes(List<int> bytes) async {
@@ -278,7 +292,9 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
                 if (!_simulatorMode) {
                   _initCamera();
                 } else {
-                  _cameraController?.stopImageStream();
+                  if (!kIsWeb) {
+                    _cameraController?.stopImageStream();
+                  }
                 }
               });
             },
@@ -339,7 +355,9 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                           child: Text(
-                            _instructionMessage,
+                            kIsWeb && !_simulatorMode
+                                ? 'Click the button below to verify your face'
+                                : _instructionMessage,
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
@@ -356,6 +374,17 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
                           onPressed: _simulateVerify,
                           icon: const Icon(Icons.flash_on_rounded),
                           label: const Text('Simulate Verification Capture'),
+                        ),
+                      )
+                    else if (kIsWeb && _isCameraInitialized)
+                      Positioned(
+                        bottom: 50,
+                        left: 40,
+                        right: 40,
+                        child: ElevatedButton.icon(
+                          onPressed: _captureAndVerify,
+                          icon: const Icon(Icons.camera_alt_rounded),
+                          label: const Text('Capture & Verify Real Face'),
                         ),
                       ),
                   ],
