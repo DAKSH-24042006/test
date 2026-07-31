@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_attendance/core/services/secure_storage_service.dart';
 
 class AppTheme {
   // Deep Navy and Emerald accents for a prestigious university feel
@@ -20,7 +22,7 @@ class AppTheme {
         error: errorColor,
         surface: const Color(0xFFF8F9FA),
       ),
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         elevation: 2,
         margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         shape: RoundedRectangleBorder(
@@ -69,7 +71,7 @@ class AppTheme {
         error: errorColor,
         surface: const Color(0xFF1E222B),
       ),
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         elevation: 2,
         margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         shape: RoundedRectangleBorder(
@@ -107,6 +109,7 @@ class AppTheme {
     );
   }
 }
+
 class ThemeNotifier extends StateNotifier<ThemeMode> {
   final SecureStorageService _storage = SecureStorageService();
 

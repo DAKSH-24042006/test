@@ -1,4 +1,4 @@
-import 'package:dio/dio';
+import 'package:dio/dio.dart';
 import 'package:smart_attendance/core/services/dio_client.dart';
 
 class FaceRepository {
