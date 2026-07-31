@@ -1203,9 +1203,13 @@
         function handleLogout() {
             stopAutoVerification();
             if (webcamStream) {
-                webcamStream.getTracks().forEach(track => track.stop());
+                try {
+                    webcamStream.getTracks().forEach(track => track.stop());
+                } catch(e) {}
                 webcamStream = null;
             }
+            const video = document.getElementById('webcam');
+            if (video) video.srcObject = null;
             localStorage.clear();
             accessToken = null;
             userRole = null;
@@ -1246,9 +1250,13 @@
                     
                     // Stop webcam if running
                     if (webcamStream) {
-                        webcamStream.getTracks().forEach(track => track.stop());
+                        try {
+                            webcamStream.getTracks().forEach(track => track.stop());
+                        } catch(e) {}
                         webcamStream = null;
                     }
+                    const video = document.getElementById('webcam');
+                    if (video) video.srcObject = null;
                     
                     await loadAdminData();
                 } else if (userRole === 'student') {
@@ -1978,9 +1986,13 @@
 
         function closeAdminEnrollment() {
             if (adminWebcamStream) {
-                adminWebcamStream.getTracks().forEach(track => track.stop());
+                try {
+                    adminWebcamStream.getTracks().forEach(track => track.stop());
+                } catch(e) {}
                 adminWebcamStream = null;
             }
+            const video = document.getElementById('adminWebcam');
+            if (video) video.srcObject = null;
             document.getElementById('adminCameraModal').classList.add('hidden');
             currentEnrollmentStudentId = null;
         }
