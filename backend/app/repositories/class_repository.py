@@ -14,32 +14,25 @@ class ClassRepository:
         try:
             clazz = await self._get_collection().find_one({"_id": ObjectId(class_id)})
             if clazz:
+                clazz["class_id"] = str(clazz["_id"])
                 clazz["_id"] = str(clazz["_id"])
             return clazz
         except Exception:
             return None
 
-    async def get_by_code(self, class_code: str) -> Optional[Dict[str, Any]]:
-        clazz = await self._get_collection().find_one({"classCode": class_code.upper()})
-        if clazz:
-            clazz["_id"] = str(clazz["_id"])
-        return clazz
-
     async def create(self, class_data: Dict[str, Any]) -> Dict[str, Any]:
         class_dict = dict(class_data)
-        class_dict["classCode"] = class_dict["classCode"].upper()
-        class_dict["createdAt"] = datetime.utcnow()
-        class_dict["updatedAt"] = datetime.utcnow()
+        class_dict["created_at"] = datetime.utcnow()
+        class_dict["updated_at"] = datetime.utcnow()
         
         result = await self._get_collection().insert_one(class_dict)
         class_dict["_id"] = str(result.inserted_id)
+        class_dict["class_id"] = str(result.inserted_id)
         return class_dict
 
     async def update(self, class_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         update_dict = dict(update_data)
-        if "classCode" in update_dict and update_dict["classCode"]:
-            update_dict["classCode"] = update_dict["classCode"].upper()
-        update_dict["updatedAt"] = datetime.utcnow()
+        update_dict["updated_at"] = datetime.utcnow()
         
         try:
             result = await self._get_collection().update_one(
@@ -63,15 +56,7 @@ class ClassRepository:
         cursor = self._get_collection().find()
         classes = []
         async for doc in cursor:
-            doc["_id"] = str(doc["_id"])
-            classes.append(doc)
-        return classes
-
-    async def list_by_teacher(self, teacher_id: str) -> List[Dict[str, Any]]:
-        # Find classes assigned to this teacher (either teacher DB ID or custom teacherId)
-        cursor = self._get_collection().find({"teacherId": teacher_id})
-        classes = []
-        async for doc in cursor:
+            doc["class_id"] = str(doc["_id"])
             doc["_id"] = str(doc["_id"])
             classes.append(doc)
         return classes

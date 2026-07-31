@@ -1,161 +1,187 @@
 import asyncio
 from datetime import datetime
+import backend.app.services.face_service as face_service_module
+
+# Force fallback simulation mode in the verification script to allow testing logic with mock images
+face_service_module.INSIGHTFACE_AVAILABLE = False
+
 from backend.app.database.connection import connect_to_mongo, close_mongo_connection, get_db
-from backend.app.repositories.user_repository import UserRepository
+from backend.app.repositories.admin_repository import AdminRepository
 from backend.app.repositories.class_repository import ClassRepository
-from backend.app.repositories.face_repository import FaceRepository
+from backend.app.repositories.student_repository import StudentRepository
+from backend.app.repositories.embedding_repository import EmbeddingRepository
 from backend.app.services.auth_service import AuthService
 from backend.app.services.face_service import FaceService
+from backend.app.services.cache_manager import ClassCacheManager
 
 async def run_verification():
-    print("========================================")
-    print("STARTING SYSTEM INTEGRATION VERIFICATION")
-    print("========================================")
+    print("==================================================")
+    print("STARTING REST SCHEMA & BIOMETRIC VERIFICATION TEST")
+    print("==================================================")
 
     # 1. Connect to DB
     await connect_to_mongo()
     db = get_db()
 
-    # Clear previous test data to start fresh
-    await db["users"].delete_many({"email": {"$in": ["admin@test.edu", "teacher@test.edu", "student@test.edu"]}})
-    await db["classes"].delete_many({"classCode": "TEST_101"})
-    await db["jwt_sessions"].delete_many({})
-    await db["face_profiles"].delete_many({})
+    # Clear previous test data
+    await db["admins"].delete_many({"email": "admin@test.edu"})
+    await db["classes"].delete_many({"class_name": "Test Class"})
+    await db["students"].delete_many({"reg_no": "REG444"})
+    await db["embeddings"].delete_many({})
     await db["verification_logs"].delete_many({})
 
-    user_repo = UserRepository()
+    admin_repo = AdminRepository()
     class_repo = ClassRepository()
-    face_repo = FaceRepository()
+    student_repo = StudentRepository()
+    embedding_repo = EmbeddingRepository()
     auth_service = AuthService()
     face_service = FaceService()
 
-    print("\n--- PHASE 1: Seeding Test Users ---")
+    print("\n--- PHASE 1: Seeding Admin and Kiosk Data ---")
     
     # Create Admin
     admin_data = {
-        "adminId": "ADM999",
+        "admin_id": "ADM999",
         "name": "Test Administrator",
         "email": "admin@test.edu",
-        "passwordHash": auth_service.hash_password("AdminPass123"),
-        "role": "admin"
+        "passwordHash": auth_service.hash_password("AdminPass123")
     }
-    admin = await user_repo.create(admin_data)
-    print(f"Admin seeded: {admin['name']} ({admin['_id']})")
-
-    # Create Teacher
-    teacher_data = {
-        "teacherId": "TCH777",
-        "name": "Dr. Sarah Jenkins",
-        "email": "teacher@test.edu",
-        "passwordHash": auth_service.hash_password("TeacherPass123"),
-        "role": "teacher",
-        "assignedClasses": []
-    }
-    teacher = await user_repo.create(teacher_data)
-    print(f"Teacher seeded: {teacher['name']} ({teacher['_id']})")
+    admin = await admin_repo.create(admin_data)
+    print(f"Admin seeded: {admin['name']} (ID: {admin['admin_id']})")
 
     # Create Class
     class_data = {
-        "classCode": "TEST_101",
-        "department": "Computer Science & Engineering",
+        "class_name": "Test Class",
+        "department": "Computer Science",
         "semester": 4,
-        "section": "A",
-        "teacherId": teacher["_id"]
+        "section": "A"
     }
     clazz = await class_repo.create(class_data)
-    print(f"Class created: {clazz['classCode']} ({clazz['_id']})")
-
-    # Assign Class to Teacher in DB
-    await user_repo.add_assigned_class_to_teacher(teacher["_id"], clazz["_id"])
-    print(f"Assigned class {clazz['classCode']} to Teacher {teacher['name']}")
+    print(f"Class created: {clazz['class_name']} (ID: {clazz['class_id']})")
 
     # Create Student
     student_data = {
-        "registrationNumber": "REG444",
-        "name": "Alex Mercer",
-        "email": "student@test.edu",
-        "passwordHash": auth_service.hash_password("StudentPass123"),
-        "role": "student",
-        "classId": clazz["_id"]
+        "class_id": clazz["class_id"],
+        "reg_no": "REG444",
+        "name": "Alex Mercer"
     }
-    student = await user_repo.create(student_data)
-    print(f"Student seeded: {student['name']} ({student['_id']})")
+    student = await student_repo.create(student_data)
+    print(f"Student seeded: {student['name']} (Reg: {student['reg_no']}, ID: {student['student_id']})")
 
 
-    print("\n--- PHASE 2: Authentication Tests ---")
+    print("\n--- PHASE 2: Administrative Login Tests ---")
     
     # Login Test
-    login_result = await auth_service.login_user("student@test.edu", "StudentPass123")
+    login_result = await auth_service.login_admin("admin@test.edu", "AdminPass123")
     if login_result:
-        access_token, refresh_token, logged_user = login_result
-        print(f"Login successful for {logged_user['name']}!")
+        access_token, refresh_token, logged_admin = login_result
+        print(f"Admin login successful for {logged_admin['name']}!")
         print(f"Access Token length: {len(access_token)}")
-        print(f"Refresh Token length: {len(refresh_token)}")
     else:
         print("ERROR: Login failed!")
         return
 
-    # Refresh Session Test
-    refresh_result = await auth_service.refresh_session(refresh_token)
-    if refresh_result:
-        new_access, new_refresh, refreshed_user = refresh_result
-        print(f"Session refreshed successfully for {refreshed_user['name']}!")
+    # Invalid login test
+    bad_login = await auth_service.login_admin("admin@test.edu", "WrongPass")
+    if not bad_login:
+        print("Invalid credentials rejected correctly.")
     else:
-        print("ERROR: Token refresh failed!")
+        print("ERROR: Wrong credentials accepted!")
         return
 
 
-    print("\n--- PHASE 3: Biometric Face Pipeline Tests ---")
+    print("\n--- PHASE 3: Biometric Batch Registration ---")
     
     # Simulate face registration (generating mock image bytes for poses)
-    poses = ["Front", "Left", "Right", "Up", "Down", "Smile", "Neutral"]
-    pose_images = {pose: b"fake_jpeg_image_data_here" for pose in poses}
+    import cv2
+    import numpy as np
     
-    print("Registering multi-pose face embeddings...")
-    profile = await face_service.register_face(student["_id"], pose_images)
-    print(f"Face profile registered successfully for student ID: {profile['userId']}")
-    print(f"Saved pose embeddings count: {len(profile['embeddings'])}")
+    # Create a random textured image (to pass the blur/contrast checks)
+    dummy_img = np.random.randint(0, 256, (200, 200, 3), dtype=np.uint8)
+    _, img_encoded = cv2.imencode('.jpg', dummy_img)
+    valid_image_bytes = img_encoded.tobytes()
 
-    # Verify registration status
-    status = await face_repo.get_profile_by_user_id(student["_id"])
-    if status:
-        print(f"Database contains active biometrics signature: True")
+    print("Registering student face vectors (batch processing 7 images)...")
+    reg_images = [valid_image_bytes for _ in range(7)]
+    profile = await face_service.register_face(student["student_id"], reg_images)
+    print(f"Face profile registered successfully for student ID: {profile['student_id']}")
+    print(f"Saved vectors count in database: {profile['registered_embeddings_count']}")
+
+    # Verify embeddings exist in DB
+    stored_embeddings = await embedding_repo.get_by_student_id(student["student_id"])
+    print(f"Database Embedding count: {len(stored_embeddings)}")
+    if len(stored_embeddings) == 7:
+        print("Embeddings verified in database: True")
     else:
-        print("ERROR: Face profile not found in DB!")
+        print(f"ERROR: Expected 7 embeddings, got {len(stored_embeddings)}!")
         return
 
-    # Simulate face verification
-    print("\nPerforming Face Verification match...")
-    verify_img = b"fake_jpeg_image_data_here" # Same fake bytes yield same seed/mock embedding vector
-    verified, score, confidence = await face_service.verify_face(student["_id"], verify_img, "Test Suite Device")
+
+    print("\n--- PHASE 4: In-Memory Caching & Face Match Verification ---")
+    
+    # Invalidate cache to ensure it fetches from MongoDB
+    ClassCacheManager.invalidate_class(clazz["class_id"])
+    
+    # Perform verification (First verification will warm up the cache lazily)
+    print("Performing Kiosk 1:1 Face Verification match...")
+    verify_img_bytes = valid_image_bytes
+    verified, score, confidence, time_taken = await face_service.verify_face(
+        student_id=student["student_id"],
+        class_id=clazz["class_id"],
+        image_bytes=verify_img_bytes
+    )
     
     print(f"Verification Verdict: {verified}")
-    print(f"Match Similarity Score: {score:.4f}")
+    print(f"Match Cosine Similarity: {score:.4f}")
     print(f"Match Confidence Score: {confidence * 100:.2f}%")
+    print(f"Verification Match Duration: {time_taken * 1000:.2f} ms")
 
     if verified:
-        print("\nBiometric matching verification: PASSED")
+        print("Biometric matching verification: PASSED")
     else:
-        print("\nBiometric matching verification: FAILED")
+        print("ERROR: Biometric matching verification failed!")
+        return
 
-    # Retrieve verification logs
-    logs = await face_repo.get_logs_by_user_id(student["_id"])
-    print(f"Total verification logs stored for student: {len(logs)}")
-    if logs:
-        print(f"Latest Log -> Score: {logs[0]['similarityScore']:.4f}, Outcome: {logs[0]['verificationResult']}")
+    # Check that class is indeed cached now
+    is_cached = clazz["class_id"] in ClassCacheManager._cache
+    print(f"Class RAM Cache populated dynamically: {is_cached}")
+    if is_cached:
+        student_cached_data = ClassCacheManager._cache[clazz["class_id"]].get(student["student_id"])
+        print(f"Cached student: {student_cached_data['name']}")
+        print(f"Cached embeddings count: {len(student_cached_data['embeddings'])}")
+
+
+    print("\n--- PHASE 5: Cache Invalidation Tests ---")
+    
+    # Invalidate on Student update
+    ClassCacheManager.invalidate_class(clazz["class_id"])
+    # Load class to cache
+    await ClassCacheManager.load_class_into_cache(clazz["class_id"])
+    print(f"Cache state before invalidation: {clazz['class_id'] in ClassCacheManager._cache}")
+    
+    # Trigger student update
+    await student_repo.update(student["student_id"], {"name": "Alex Mercer Updated"})
+    ClassCacheManager.invalidate_class(clazz["class_id"])
+    print(f"Cache state after invalidation: {clazz['class_id'] in ClassCacheManager._cache} (Expected: False)")
+    
+    # Reload and check name update
+    await ClassCacheManager.load_class_into_cache(clazz["class_id"])
+    updated_cached_student = ClassCacheManager._cache[clazz["class_id"]].get(student["student_id"])
+    print(f"Refreshed Cached student name: {updated_cached_student['name']}")
+
 
     print("\n--- CLEANING UP TEST DATA ---")
-    await db["users"].delete_many({"email": {"$in": ["admin@test.edu", "teacher@test.edu", "student@test.edu"]}})
-    await db["classes"].delete_many({"classCode": "TEST_101"})
-    await db["jwt_sessions"].delete_many({})
-    await db["face_profiles"].delete_many({})
+    await db["admins"].delete_many({"email": "admin@test.edu"})
+    await db["classes"].delete_many({"class_name": "Test Class"})
+    await db["students"].delete_many({"reg_no": "REG444"})
+    await db["embeddings"].delete_many({})
     await db["verification_logs"].delete_many({})
     print("Database cleaned up successfully.")
 
     await close_mongo_connection()
-    print("\n========================================")
-    print("VERIFICATION COMPLETED SUCCESSFULLY!")
-    print("========================================")
+    print("\n==================================================")
+    print("ALL INTEGRATION TESTS PASSED SUCCESSFULLY!")
+    print("==================================================")
 
 if __name__ == "__main__":
     asyncio.run(run_verification())

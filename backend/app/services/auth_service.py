@@ -2,14 +2,13 @@ import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
-from fastapi import HTTPException, status
 from backend.app.database.connection import settings
-from backend.app.repositories.user_repository import UserRepository
+from backend.app.repositories.admin_repository import AdminRepository
 from backend.app.repositories.session_repository import SessionRepository
 
 class AuthService:
     def __init__(self):
-        self.user_repo = UserRepository()
+        self.admin_repo = AdminRepository()
         self.session_repo = SessionRepository()
 
     def hash_password(self, password: str) -> str:
@@ -49,94 +48,57 @@ class AuthService:
         encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
         return encoded_jwt, expire
 
-    async def authenticate_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
-        user = await self.user_repo.get_by_email(email)
-        if not user:
+    async def authenticate_admin(self, email: str, password: str) -> Optional[Dict[str, Any]]:
+        admin = await self.admin_repo.get_by_email(email)
+        if not admin:
             return None
         
-        if not self.verify_password(password, user["passwordHash"]):
+        if not self.verify_password(password, admin["passwordHash"]):
             return None
             
-        return user
+        return admin
 
-    async def login_user(self, email: str, password: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
-        user = await self.authenticate_user(email, password)
-        if not user:
+    async def login_admin(self, email: str, password: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
+        admin = await self.authenticate_admin(email, password)
+        if not admin:
             return None
         
         # Generate tokens
-        token_data = {"sub": user["_id"], "role": user["role"], "email": user["email"]}
+        token_data = {"sub": admin["_id"], "role": "admin", "email": admin["email"]}
         access_token = self.create_access_token(data=token_data)
         refresh_token, expires_at = self.create_refresh_token(data=token_data)
         
         # Save session
-        await self.session_repo.create_session(user["_id"], refresh_token, expires_at)
+        await self.session_repo.create_session(admin["_id"], refresh_token, expires_at)
         
-        return access_token, refresh_token, user
+        return access_token, refresh_token, admin
 
     async def refresh_session(self, refresh_token: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
-        # Validate refresh token structure
         try:
             payload = jwt.decode(refresh_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
             if payload.get("type") != "refresh":
                 return None
-            user_id = payload.get("sub")
+            admin_id = payload.get("sub")
         except JWTError:
             return None
             
-        # Check in DB
         session = await self.session_repo.get_session(refresh_token)
         if not session or session["revoked"] or session["expiresAt"] < datetime.utcnow():
             return None
             
-        # Retrieve user
-        user = await self.user_repo.get_by_id(user_id)
-        if not user:
+        admin = await self.admin_repo.get_by_id(admin_id)
+        if not admin:
             return None
             
-        # Revoke old session and create a new one (Token Rotation)
         await self.session_repo.revoke_session(refresh_token)
         
-        token_data = {"sub": user["_id"], "role": user["role"], "email": user["email"]}
+        token_data = {"sub": admin["_id"], "role": "admin", "email": admin["email"]}
         new_access_token = self.create_access_token(data=token_data)
         new_refresh_token, expires_at = self.create_refresh_token(data=token_data)
         
-        await self.session_repo.create_session(user["_id"], new_refresh_token, expires_at)
+        await self.session_repo.create_session(admin["_id"], new_refresh_token, expires_at)
         
-        return new_access_token, new_refresh_token, user
+        return new_access_token, new_refresh_token, admin
 
-    async def logout_user(self, refresh_token: str) -> bool:
+    async def logout_admin(self, refresh_token: str) -> bool:
         return await self.session_repo.revoke_session(refresh_token)
-
-    async def generate_reset_token(self, email: str) -> Optional[str]:
-        user = await self.user_repo.get_by_email(email)
-        if not user:
-            return None
-            
-        # Short lived reset token (10 mins)
-        reset_data = {"sub": user["_id"], "type": "reset", "email": email}
-        reset_token = jwt.encode(
-            reset_data, 
-            settings.JWT_SECRET, 
-            algorithm=settings.JWT_ALGORITHM
-        )
-        return reset_token
-
-    async def reset_password(self, token: str, new_password: str) -> bool:
-        try:
-            payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-            if payload.get("type") != "reset":
-                return False
-            user_id = payload.get("sub")
-        except JWTError:
-            return False
-            
-        hashed_password = self.hash_password(new_password)
-        updated_user = await self.user_repo.update(user_id, {"passwordHash": hashed_password})
-        
-        if updated_user:
-            # Revoke all sessions for this user on password reset
-            await self.session_repo.revoke_all_user_sessions(user_id)
-            return True
-            
-        return False
