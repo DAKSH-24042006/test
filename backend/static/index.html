@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biometric Portal — Enterprise Face Verification</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --bg-color: #080c14;
+            --card-bg: rgba(15, 23, 42, 0.65);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.35);
+            --accent: #06b6d4;
+            --accent-glow: rgba(6, 182, 212, 0.3);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.2);
+            --error: #f43f5e;
+            --error-glow: rgba(244, 63, 94, 0.25);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 5% 10%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 95% 90%, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
+            background-attachment: fixed;
+            padding: 1.5rem;
+        }
+
+        /* Loading Screen overlay */
+        .global-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-color);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4.5px solid rgba(99, 102, 241, 0.15);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 450px;
+            padding: 2.5rem;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Form elements */
+        .form-group {
+            margin-bottom: 1.25rem;
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: #fff;
+            font-size: 0.95rem;
+            transition: all 0.25s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 15px var(--primary-glow);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 0.8rem 1.25rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            border: none;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+            color: #fff;
+            box-shadow: 0 4px 20px var(--primary-glow);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-danger {
+            background: rgba(244, 63, 94, 0.15);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #fca5a5;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: rgba(244, 63, 94, 0.25);
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Headings */
+        .title-container {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .main-title {
+            font-size: 1.65rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.35rem;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .alert {
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.25);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: #fecdd3;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #a7f3d0;
+        }
+
+        /* Account selection hints */
+        .account-hints {
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+            border-top: 1px dashed var(--border-color);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .account-hints span {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            color: var(--text-main);
+            margin: 0.1rem 0;
+            cursor: pointer;
+        }
+
+        /* Workspace Grid (Student View) */
+        .student-workspace {
+            width: 95%;
+            max-width: 1050px;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 2rem;
+            padding: 1rem 0;
+        }
+
+        /* Admin Workspace (Admin View) */
+        .admin-workspace {
+            width: 95%;
+            max-width: 1280px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            padding: 1rem 0;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 1.9fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 992px) {
+            .student-workspace, .admin-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Top Panel Navigation Header */
+        .workspace-header {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100%;
+        }
+
+        .header-profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .avatar-ring {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .profile-text h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .profile-text p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Stats Cards (Overview stats) */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1.25rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .stat-value-accent {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Dashboard Cards & Layout */
+        .panel-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 1.75rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
+        }
+
+        /* Camera Box */
+        .camera-container {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: fit-content;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
+        }
+
+        .camera-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.05);
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        .oval-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 52%;
+            height: 68%;
+            border: 2.5px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 50% / 50%;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(8, 12, 20, 0.65);
+            transition: all 0.3s ease;
+        }
+
+        .oval-guide.active {
+            border-color: var(--accent);
+            border-style: solid;
+            box-shadow: 0 0 15px var(--accent-glow), 0 0 0 9999px rgba(8, 12, 20, 0.5);
+        }
+
+        .oval-guide.error {
+            border-color: var(--error);
+            border-style: solid;
+            box-shadow: 0 0 15px var(--error-glow), 0 0 0 9999px rgba(8, 12, 20, 0.55);
+        }
+
+        .oval-guide.scanning {
+            border-color: var(--accent);
+            border-style: solid;
+            box-shadow: 0 0 20px var(--accent-glow), 0 0 0 9999px rgba(8, 12, 20, 0.5);
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            0% {
+                border-color: var(--accent);
+                box-shadow: 0 0 10px var(--accent-glow), 0 0 0 9999px rgba(8, 12, 20, 0.5);
+            }
+            100% {
+                border-color: var(--primary);
+                box-shadow: 0 0 30px var(--primary-glow), 0 0 0 9999px rgba(8, 12, 20, 0.5);
+            }
+        }
+
+        .flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .flash-active {
+            animation: flash 0.2s ease-out;
+        }
+
+        @keyframes flash {
+            0% { opacity: 0; }
+            50% { opacity: 0.85; }
+            100% { opacity: 0; }
+        }
+
+        /* Control tab system */
+        .panel-nav {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.25rem;
+            gap: 1.5rem;
+        }
+
+        .nav-tab {
+            padding: 0.6rem 0.25rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            position: relative;
+            transition: color 0.3s ease;
+        }
+
+        .nav-tab:hover {
+            color: #fff;
+        }
+
+        .nav-tab.active {
+            color: var(--primary);
+        }
+
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Pose Grid List */
+        .pose-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.6rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .pose-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.6rem 0.1rem;
+            text-align: center;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pose-item.active {
+            border-color: var(--primary);
+            color: #fff;
+            background: rgba(99, 102, 241, 0.08);
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
+        }
+
+        .pose-item.captured {
+            border-color: var(--emerald);
+            color: #fff;
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .pose-item .thumbnail {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.25;
+            z-index: 0;
+        }
+
+        .pose-item span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Score Gauge widgets */
+        .results-container {
+            text-align: center;
+            padding: 0.5rem 0;
+        }
+
+        .result-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4rem 1.1rem;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1.25rem;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+        }
+
+        .badge-fail {
+            background: rgba(244, 63, 94, 0.15);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #fda4af;
+            box-shadow: 0 0 10px rgba(244, 63, 94, 0.1);
+        }
+
+        .gauge-row {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 1.25rem;
+            gap: 1rem;
+        }
+
+        .gauge-circle {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+
+        .gauge-circle svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .gauge-circle circle {
+            fill: none;
+            stroke-width: 8;
+        }
+
+        .gauge-bg {
+            stroke: rgba(255, 255, 255, 0.04);
+        }
+
+        .gauge-fill {
+            stroke: var(--primary);
+            stroke-dasharray: 251.3;
+            stroke-dashoffset: 251.3;
+            transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            stroke-linecap: round;
+        }
+
+        .gauge-fill-accent {
+            stroke: var(--accent);
+        }
+
+        .gauge-val {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .gauge-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+            font-weight: 500;
+        }
+
+        /* Table Components (Grids) */
+        .table-wrapper {
+            margin-top: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.12);
+        }
+
+        .table-scrollable {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .table-large {
+            max-height: 380px;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            text-align: left;
+        }
+
+        .admin-table th {
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .admin-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+            color: var(--text-main);
+        }
+
+        .admin-table tr:hover td {
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .admin-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge-pill {
+            display: inline-flex;
+            padding: 0.25rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .badge-pill-success {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .badge-pill-fail {
+            background: rgba(244, 63, 94, 0.12);
+            border: 1px solid rgba(244, 63, 94, 0.2);
+            color: #fda4af;
+        }
+
+        .card-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-header-bar h4 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="globalLoader" class="global-loader">
+        <div class="spinner"></div>
+        <p style="font-weight: 500; font-size: 0.9rem; color: var(--text-muted);">Configuring biometric environment...</p>
+    </div>
+
+    <!-- Login Container -->
+    <div id="loginCard" class="glass-card">
+        <div class="title-container">
+            <h1 class="main-title">Biometric Portal</h1>
+            <p class="subtitle">Secure Biometrics Verification Console</p>
+        </div>
+        
+        <div id="loginAlert" class="alert hidden">
+            <span>Incorrect email or password.</span>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label" for="email">User Email</label>
+                <input class="form-input" type="email" id="email" required placeholder="email@smart.edu">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input class="form-input" type="password" id="password" required placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary" type="submit" id="loginBtn" style="margin-top: 1rem;">
+                Authenticate Identity
+            </button>
+        </form>
+
+        <div class="account-hints">
+            <p style="margin-bottom: 0.35rem; font-weight: 600;">Default Test Logins:</p>
+            <p>👨‍💼 Admin: <span onclick="fillLogin('admin@smart.edu', 'AdminPassword123')">admin@smart.edu</span></p>
+            <p>🎓 Student: <span onclick="fillLogin('student@smart.edu', 'StudentPassword123')">student@smart.edu</span></p>
+        </div>
+    </div>
+
+    <!-- Application Dashboard Shell (Hidden initially) -->
+    <div id="dashboardShell" class="hidden" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
+        
+        <!-- Header Bar -->
+        <div class="workspace-header">
+            <div class="header-profile">
+                <div class="avatar-ring" id="userAvatar">A</div>
+                <div class="profile-text">
+                    <h3 id="userName">User Profile</h3>
+                    <p id="userEmail">user@smart.edu</p>
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="handleLogout()" style="width: auto; font-size: 0.85rem; padding: 0.5rem 1rem;">
+                Log Out
+            </button>
+        </div>
+
+        <!-- ==================== STUDENT WORKSPACE ==================== -->
+        <div id="studentWorkspace" class="student-workspace hidden">
+            
+            <!-- Left Side: Camera Preview -->
+            <div class="camera-container">
+                <div class="camera-wrapper">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <div id="ovalGuide" class="oval-guide"></div>
+                    <div id="flashOverlay" class="flash-overlay"></div>
+                </div>
+                <p id="camStatus" style="margin-top: 1rem; font-size: 0.8rem; font-weight: 500; text-align: center; color: var(--text-muted);">
+                    Initializing Camera Feed...
+                </p>
+            </div>
+
+            <!-- Right Side: Enrollment/Verify controls -->
+            <div class="control-panel">
+                
+                <div class="panel-nav">
+                    <div class="nav-tab active" id="tabVerify" onclick="switchStudentTab('verify')">Face Match / Verify</div>
+                    <div class="nav-tab" id="tabRegister" onclick="switchStudentTab('register')">Biometrics Enrollment</div>
+                </div>
+
+                <!-- Tab Verify -->
+                <div id="contentVerify" class="tab-content">
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.45;">
+                        Position your face inside the guide lines and match your face parameters against your registered biometrics database signature.
+                    </p>
+
+                    <div id="verifyResultArea" class="results-container hidden">
+                        <div id="verifyVerdictBadge" class="result-badge">MATCH VERIFIED</div>
+                        
+                        <div class="gauge-row">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div class="gauge-circle">
+                                    <svg>
+                                        <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
+                                        <circle id="similarityFill" class="gauge-fill" cx="50" cy="50" r="40"></circle>
+                                    </svg>
+                                    <span id="similarityVal" class="gauge-val">0%</span>
+                                </div>
+                                <span class="gauge-label">Similarity</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div class="gauge-circle">
+                                    <svg>
+                                        <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
+                                        <circle id="confidenceFill" class="gauge-fill gauge-fill-accent" cx="50" cy="50" r="40"></circle>
+                                    </svg>
+                                    <span id="confidenceVal" class="gauge-val">0%</span>
+                                </div>
+                                <span class="gauge-label">Confidence</span>
+                            </div>
+                        </div>
+                        <p id="verifyResultMsg" style="font-size: 0.85rem; font-weight: 500; color: #fff; margin-bottom: 1.25rem;"></p>
+                    </div>
+
+                    <div id="verifyScanningStatus" style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.8rem; border-radius: 12px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); color: var(--accent); font-size: 0.9rem; font-weight: 600; margin-bottom: 1rem;">
+                        <div class="spinner" style="width: 18px; height: 18px; border-width: 2px; margin-bottom: 0;"></div>
+                        <span>Scanning & Matching Face...</span>
+                    </div>
+
+                    <button class="btn btn-secondary hidden" id="btnRescan" onclick="startAutoVerification()" style="margin-top: 1rem;">
+                        Restart Scanner
+                    </button>
+
+                    <!-- Student Personal Log Feed -->
+                    <div style="margin-top: 1.75rem;">
+                        <h5 style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.05em;">
+                            My Recent Logs
+                        </h5>
+                        <div class="table-wrapper">
+                            <div class="table-scrollable">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Verdict</th>
+                                            <th>Similarity</th>
+                                            <th>Device Info</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="studentLogBody">
+                                        <tr>
+                                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1rem;">No recent logs</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Register -->
+                <div id="contentRegister" class="tab-content hidden">
+                    <!-- Permission lock screen -->
+                    <div id="registerLockArea" class="hidden" style="text-align: center; padding: 2rem 1rem; border: 1px dashed var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.1);">
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.5;">
+                            Face registration is locked. You must submit a request and receive administrative approval before registering your face.
+                        </p>
+                        <button class="btn btn-primary" id="btnRequestPerm" onclick="requestRegistrationPermission()">
+                            Request Face Registration Permission
+                        </button>
+                    </div>
+
+                    <!-- Pending permission screen -->
+                    <div id="registerPendingArea" class="hidden" style="text-align: center; padding: 2rem 1rem; border: 1px dashed var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.1);">
+                        <div class="spinner" style="margin: 0 auto 1.25rem;"></div>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">
+                            Your permission request is pending. Please wait for an administrator to approve it.
+                        </p>
+                    </div>
+
+                    <!-- Main active enrollment controls -->
+                    <div id="registerActiveArea" class="hidden">
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.45;">
+                            Capture all 7 required pose pictures in order to register a biometric face verification template on the server.
+                        </p>
+
+                        <div class="pose-grid">
+                            <div class="pose-item active" id="pose_Front" onclick="selectPose('Front')">
+                                <span>Front</span>
+                            </div>
+                            <div class="pose-item" id="pose_Left" onclick="selectPose('Left')">
+                                <span>Left</span>
+                            </div>
+                            <div class="pose-item" id="pose_Right" onclick="selectPose('Right')">
+                                <span>Right</span>
+                            </div>
+                            <div class="pose-item" id="pose_Up" onclick="selectPose('Up')">
+                                <span>Up</span>
+                            </div>
+                            <div class="pose-item" id="pose_Down" onclick="selectPose('Down')">
+                                <span>Down</span>
+                            </div>
+                            <div class="pose-item" id="pose_Smile" onclick="selectPose('Smile')">
+                                <span>Smile</span>
+                            </div>
+                            <div class="pose-item" id="pose_Neutral" onclick="selectPose('Neutral')">
+                                <span>Neutral</span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                            <button class="btn btn-secondary" style="flex: 1;" id="btnCapturePose" onclick="captureCurrentPose()">
+                                Capture Snapshot
+                            </button>
+                            <button class="btn btn-primary" style="flex: 1.2;" id="btnSubmitReg" disabled onclick="submitRegistration()">
+                                Submit Biometrics
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ADMIN WORKSPACE ==================== -->
+        <div id="adminWorkspace" class="admin-workspace hidden">
+            
+            <!-- Key Stats Header Cards -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <span class="stat-label">Total Classes</span>
+                    <span class="stat-value" id="statClasses">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Total Teachers</span>
+                    <span class="stat-value" id="statTeachers">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Registered Students</span>
+                    <span class="stat-value stat-value-accent" id="statRegistered">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Registration Rate</span>
+                    <span class="stat-value" style="color: var(--emerald);" id="statRate">0%</span>
+                </div>
+            </div>
+
+            <!-- Double Column layout for Admin Operations -->
+            <div class="admin-grid">
+                
+                <!-- Left Column: Create Student profile -->
+                <div class="panel-card" style="height: fit-content;">
+                    <div class="card-header-bar">
+                        <h4>Create Student Profile</h4>
+                    </div>
+
+                    <div id="adminFormAlert" class="alert hidden">
+                        <span>Profile creation failed.</span>
+                    </div>
+
+                    <form id="createStudentForm" onsubmit="handleCreateStudent(event)">
+                        <div class="form-group">
+                            <label class="form-label" for="regNumber">Registration Number</label>
+                            <input class="form-input" type="text" id="regNumber" placeholder="REG002" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="studentName">Full Name</label>
+                            <input class="form-input" type="text" id="studentName" placeholder="Jane Doe" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="studentEmail">Email Address</label>
+                            <input class="form-input" type="email" id="studentEmail" placeholder="jane.doe@smart.edu" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="studentPass">Account Password</label>
+                            <input class="form-input" type="password" id="studentPass" placeholder="••••••••" required value="StudentPassword123">
+                        </div>
+                        <button class="btn btn-primary" type="submit" id="btnCreateStudent" style="margin-top: 0.5rem;">
+                            Register Student Account
+                        </button>
+                    </form>
+                    <button class="btn btn-danger" onclick="triggerResetDatabase()" style="margin-top: 1.25rem;">
+                        Reset Biometrics Database
+                    </button>
+                </div>
+
+                <!-- Right Column: Student Grid Listing -->
+                <div class="panel-card" style="display: flex; flex-direction: column;">
+                    <div class="card-header-bar">
+                        <h4>Students Biometrics Directory</h4>
+                    </div>
+                    
+                    <div class="table-wrapper" style="flex: 1; margin-top: 0;">
+                        <div class="table-scrollable table-large">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reg. Number</th>
+                                        <th>Student Name</th>
+                                        <th>Email Address</th>
+                                        <th>Biometric Enrollment</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminStudentsTableBody">
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No student records found</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Full Width Column: Pending Registration Approvals -->
+            <div id="adminPendingApprovalsCard" class="panel-card hidden">
+                <div class="card-header-bar">
+                    <h4>Pending Biometric Registration Requests</h4>
+                </div>
+                
+                <div class="table-wrapper" style="margin-top: 0;">
+                    <div class="table-scrollable">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Reg. Number</th>
+                                    <th>Student Name</th>
+                                    <th>Email Address</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminApprovalsTableBody">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No pending permission requests</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Width Column: System-wide verification logs -->
+            <div class="panel-card">
+                <div class="card-header-bar">
+                    <h4>System Biometric Match Activity Log</h4>
+                </div>
+                
+                <div class="table-wrapper" style="margin-top: 0;">
+                    <div class="table-scrollable">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Student Name</th>
+                                    <th>Email Address</th>
+                                    <th>Match Verdict</th>
+                                    <th>Similarity</th>
+                                    <th>Confidence</th>
+                                    <th>Punch Device</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminSystemLogsTableBody">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No logs logged in database</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Hidden canvas for video captures -->
+    <canvas id="photoCanvas" class="hidden" width="640" height="480"></canvas>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let accessToken = null;
+        let userRole = null;
+        let activeStudentTab = 'verify';
+        let webcamStream = null;
+        let autoVerifyInterval = null;
+        let isAutoVerifying = false;
+
+        // Enrollment poses
+        const poses = ['Front', 'Left', 'Right', 'Up', 'Down', 'Smile', 'Neutral'];
+        let currentPose = 'Front';
+        const capturedBlobs = {};
+
+        // Auto-fill login boxes from badges
+        function fillLogin(email, pass) {
+            document.getElementById('email').value = email;
+            document.getElementById('password').value = pass;
+        }
+
+        // On Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedToken = localStorage.getItem('biometric_token');
+            const savedRole = localStorage.getItem('biometric_role');
+            if (savedToken && savedRole) {
+                accessToken = savedToken;
+                userRole = savedRole;
+                showDashboard();
+            } else {
+                document.getElementById('globalLoader').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('globalLoader').classList.add('hidden');
+                }, 400);
+            }
+        });
+
+        // Toggle Student Tabs
+        function switchStudentTab(tab) {
+            if (tab === activeStudentTab) return;
+            activeStudentTab = tab;
+            
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+
+            if (tab === 'verify') {
+                document.getElementById('tabVerify').classList.add('active');
+                document.getElementById('contentVerify').classList.remove('hidden');
+                document.getElementById('ovalGuide').className = 'oval-guide';
+                startAutoVerification();
+            } else {
+                stopAutoVerification();
+                document.getElementById('tabRegister').classList.add('active');
+                document.getElementById('contentRegister').classList.remove('hidden');
+                updatePoseUI();
+            }
+        }
+
+        // Authentication POST handler
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const alertBox = document.getElementById('loginAlert');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Authenticating Identity...';
+            alertBox.classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (!response.ok) throw new Error('Incorrect credentials');
+
+                const data = await response.json();
+                accessToken = data.accessToken;
+                userRole = data.user.role;
+                
+                localStorage.setItem('biometric_token', accessToken);
+                localStorage.setItem('biometric_role', userRole);
+                
+                showDashboard();
+            } catch (err) {
+                alertBox.classList.remove('hidden');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Authenticate Identity';
+            }
+        }
+
+        // User Sign-out
+        function handleLogout() {
+            stopAutoVerification();
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            localStorage.clear();
+            accessToken = null;
+            userRole = null;
+
+            // Reset views
+            document.getElementById('dashboardShell').classList.add('hidden');
+            document.getElementById('studentWorkspace').classList.add('hidden');
+            document.getElementById('adminWorkspace').classList.add('hidden');
+            
+            document.getElementById('loginCard').classList.remove('hidden');
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('loginBtn').textContent = 'Authenticate Identity';
+        }
+
+        // Launch Dashboard View based on role
+        async function showDashboard() {
+            document.getElementById('loginCard').classList.add('hidden');
+            document.getElementById('globalLoader').classList.remove('hidden');
+            document.getElementById('globalLoader').style.opacity = '1';
+
+            try {
+                // Fetch profile to verify token
+                const profileRes = await fetch(`${API_BASE}/auth/profile`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!profileRes.ok) throw new Error('Token expired');
+                const profile = await profileRes.json();
+                
+                document.getElementById('userName').textContent = profile.name;
+                document.getElementById('userEmail').textContent = profile.email + ` [${profile.role.toUpperCase()}]`;
+                document.getElementById('userAvatar').textContent = profile.name.charAt(0).toUpperCase();
+
+                // Switch workspace layouts
+                if (userRole === 'admin') {
+                    stopAutoVerification();
+                    document.getElementById('studentWorkspace').classList.add('hidden');
+                    document.getElementById('adminWorkspace').classList.remove('hidden');
+                    
+                    // Stop webcam if running
+                    if (webcamStream) {
+                        webcamStream.getTracks().forEach(track => track.stop());
+                        webcamStream = null;
+                    }
+                    
+                    await loadAdminData();
+                } else if (userRole === 'student') {
+                    document.getElementById('adminWorkspace').classList.add('hidden');
+                    document.getElementById('studentWorkspace').classList.remove('remove');
+                    document.getElementById('studentWorkspace').classList.remove('hidden');
+                    
+                    await loadStudentData();
+                    await initWebcam();
+                    startAutoVerification();
+                }
+
+                document.getElementById('dashboardShell').classList.remove('hidden');
+            } catch (e) {
+                console.error(e);
+                handleLogout();
+            } finally {
+                document.getElementById('globalLoader').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('globalLoader').classList.add('hidden');
+                }, 400);
+            }
+        }
+
+        /* ==================== STUDENT ACTIONS ==================== */
+        
+        async function loadStudentData() {
+            try {
+                const statusRes = await fetch(`${API_BASE}/face/status`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const status = await statusRes.json();
+                
+                // Control enrollment lock based on permission status
+                const approvalStatus = status.registrationApprovalStatus || "none";
+                const lockArea = document.getElementById('registerLockArea');
+                const pendingArea = document.getElementById('registerPendingArea');
+                const activeArea = document.getElementById('registerActiveArea');
+                
+                if (approvalStatus === 'approved') {
+                    lockArea.classList.add('hidden');
+                    pendingArea.classList.add('hidden');
+                    activeArea.classList.remove('hidden');
+                } else if (approvalStatus === 'pending') {
+                    lockArea.classList.add('hidden');
+                    pendingArea.classList.remove('hidden');
+                    activeArea.classList.add('hidden');
+                } else {
+                    lockArea.classList.remove('hidden');
+                    pendingArea.classList.add('hidden');
+                    activeArea.classList.add('hidden');
+                    
+                    const reqBtn = document.getElementById('btnRequestPerm');
+                    reqBtn.disabled = false;
+                    reqBtn.textContent = 'Request Face Registration Permission';
+                }
+                
+                // Get logs for the current student by fetching admin logs (or generic endpoints).
+                // Wait! Since standard students cannot access /admin/logs, we fetch the logs from the student logs endpoint if any,
+                // or just display a filtered list. Wait! FaceRepository does not have a public /face/logs endpoint in the route.
+                // Wait! Let's check face_routes.py... Ah! Face routes does not have a logs endpoint for students.
+                // Wait, does verify_endpoints have log retrieval? Yes, verify_endpoints does face_repo.get_logs_by_user_id.
+                // So student logs is not exposed as route? Let's check face_routes.py again.
+                // Ah, face_routes does not expose logs! Let's write a simple endpoint `/face/logs` in face_routes.py so the student can retrieve their own logs.
+                // Wait, let's look at `face_routes.py`. We didn't add it in our implementation plan, but it's a very simple and natural feature to support the student's log grid.
+                // Or we can just let students view their verification status.
+                // Let's implement `/face/logs` in face_routes.py to make it fully functional!
+                // Wait, let's call the endpoint. If we hit 404, we will handle it gracefully.
+                
+                const logsRes = await fetch(`${API_BASE}/face/logs`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                const tbody = document.getElementById('studentLogBody');
+                tbody.innerHTML = '';
+
+                if (logsRes.ok) {
+                    const logs = await logsRes.json();
+                    if (logs.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1rem;">No recent logs</td></tr>`;
+                    } else {
+                        logs.slice(0, 4).forEach(log => {
+                            const row = document.createElement('tr');
+                            const ts = new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                            const verdict = log.verificationResult ? 
+                                '<span class="badge-pill badge-pill-success">PASS</span>' : 
+                                '<span class="badge-pill badge-pill-fail">FAIL</span>';
+                            const sim = (log.similarityScore * 100).toFixed(0) + '%';
+                            row.innerHTML = `<td>${ts}</td><td>${verdict}</td><td>${sim}</td><td>${log.deviceInformation || 'Web'}</td>`;
+                            tbody.appendChild(row);
+                        });
+                    }
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1rem;">Log database offline</td></tr>`;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function initWebcam() {
+            const video = document.getElementById('webcam');
+            const statusText = document.getElementById('camStatus');
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = webcamStream;
+                statusText.textContent = 'Active Camera Feed — Mirror Mode';
+                statusText.style.color = 'var(--emerald)';
+            } catch (err) {
+                console.error(err);
+                statusText.textContent = 'Error: Camera feed access denied.';
+                statusText.style.color = 'var(--error)';
+            }
+        }
+
+        function triggerFlash() {
+            const flash = document.getElementById('flashOverlay');
+            flash.classList.add('flash-active');
+            setTimeout(() => flash.classList.remove('flash-active'), 200);
+        }
+
+        function captureFrame() {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('photoCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            
+            triggerFlash();
+        }
+
+        function startAutoVerification() {
+            if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+            
+            // Reset verification result display
+            document.getElementById('verifyResultArea').classList.add('hidden');
+            document.getElementById('verifyScanningStatus').classList.remove('hidden');
+            document.getElementById('btnRescan').classList.add('hidden');
+            
+            const oval = document.getElementById('ovalGuide');
+            if (oval) oval.className = 'oval-guide scanning';
+
+            isAutoVerifying = true;
+            autoVerifyInterval = setInterval(async () => {
+                if (!isAutoVerifying) return;
+                
+                const video = document.getElementById('webcam');
+                if (!video || video.paused || video.ended || !webcamStream) return;
+
+                await performAutoVerificationMatch();
+            }, 1500);
+        }
+
+        function stopAutoVerification() {
+            isAutoVerifying = false;
+            if (autoVerifyInterval) {
+                clearInterval(autoVerifyInterval);
+                autoVerifyInterval = null;
+            }
+            const oval = document.getElementById('ovalGuide');
+            if (oval && (oval.className.includes('scanning') || oval.className.includes('active') || oval.className.includes('error'))) {
+                oval.className = 'oval-guide';
+            }
+        }
+
+        async function performAutoVerificationMatch() {
+            const canvas = document.getElementById('photoCanvas');
+            const ctx = canvas.getContext('2d');
+            const video = document.getElementById('webcam');
+
+            // Draw current webcam frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            canvas.toBlob(async (blob) => {
+                if (!isAutoVerifying) return;
+
+                const formData = new FormData();
+                formData.append('image', blob, 'verify.jpg');
+                formData.append('device_info', 'Browser Biometric Console (Auto-Track)');
+
+                try {
+                    const res = await fetch(`${API_BASE}/face/verify`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${accessToken}` },
+                        body: formData
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || 'Verification mismatch');
+                    }
+
+                    const data = await res.json();
+                    if (!isAutoVerifying) return;
+                    
+                    document.getElementById('verifyResultArea').classList.remove('hidden');
+                    
+                    const badge = document.getElementById('verifyVerdictBadge');
+                    const msgText = document.getElementById('verifyResultMsg');
+                    const oval = document.getElementById('ovalGuide');
+                    
+                    msgText.textContent = data.message;
+
+                    const simOffset = 251.3 - (251.3 * Math.max(0, Math.min(1, data.similarityScore)));
+                    const confOffset = 251.3 - (251.3 * Math.max(0, Math.min(1, data.confidence)));
+
+                    document.getElementById('similarityFill').style.strokeDashoffset = simOffset;
+                    document.getElementById('confidenceFill').style.strokeDashoffset = confOffset;
+
+                    document.getElementById('similarityVal').textContent = (data.similarityScore * 100).toFixed(0) + '%';
+                    document.getElementById('confidenceVal').textContent = (data.confidence * 100).toFixed(0) + '%';
+
+                    if (data.verified) {
+                        stopAutoVerification();
+                        
+                        badge.textContent = 'MATCH VERIFIED';
+                        badge.className = 'result-badge badge-success';
+                        if (oval) oval.className = 'oval-guide active';
+                        
+                        document.getElementById('verifyScanningStatus').classList.add('hidden');
+                        document.getElementById('btnRescan').classList.remove('hidden');
+                        
+                        triggerFlash();
+                        await loadStudentData();
+                    } else {
+                        badge.textContent = 'SCANNING PROFILE...';
+                        badge.className = 'result-badge badge-fail';
+                        if (oval) oval.className = 'oval-guide scanning';
+                    }
+                } catch (e) {
+                    console.error("Auto verification error:", e);
+                }
+            }, 'image/jpeg', 0.95);
+        }
+
+        function selectPose(poseName) {
+            currentPose = poseName;
+            updatePoseUI();
+        }
+
+        function updatePoseUI() {
+            document.querySelectorAll('.pose-item').forEach(el => {
+                el.classList.remove('active');
+                const pose = el.id.replace('pose_', '');
+                if (pose === currentPose) {
+                    el.classList.add('active');
+                }
+            });
+
+            const oval = document.getElementById('ovalGuide');
+            if (capturedBlobs[currentPose]) {
+                oval.className = 'oval-guide active';
+            } else {
+                oval.className = 'oval-guide';
+            }
+
+            const allCaptured = poses.every(p => capturedBlobs[p]);
+            document.getElementById('btnSubmitReg').disabled = !allCaptured;
+        }
+
+        function captureCurrentPose() {
+            captureFrame();
+            const canvas = document.getElementById('photoCanvas');
+            
+            canvas.toBlob((blob) => {
+                capturedBlobs[currentPose] = blob;
+                
+                const cell = document.getElementById(`pose_${currentPose}`);
+                cell.classList.add('captured');
+                
+                const existing = cell.querySelector('img');
+                if (existing) existing.remove();
+                
+                const img = document.createElement('img');
+                img.className = 'thumbnail';
+                img.src = URL.createObjectURL(blob);
+                cell.appendChild(img);
+
+                const currentIdx = poses.indexOf(currentPose);
+                if (currentIdx < poses.length - 1) {
+                    currentPose = poses[currentIdx + 1];
+                }
+                updatePoseUI();
+            }, 'image/jpeg', 0.95);
+        }
+
+        async function submitRegistration() {
+            const btn = document.getElementById('btnSubmitReg');
+            const captureBtn = document.getElementById('btnCapturePose');
+            
+            btn.disabled = true;
+            btn.textContent = 'Submitting Vectors...';
+            captureBtn.disabled = true;
+
+            const formData = new FormData();
+            for (let pose of poses) {
+                const key = pose.toLowerCase().replace(' ', '_');
+                formData.append(key, capturedBlobs[pose], `${key}.jpg`);
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/face/register`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Biometrics submission failed');
+                }
+
+                alert('Biometric parameters registered successfully!');
+                
+                document.querySelectorAll('.pose-item').forEach(el => {
+                    el.classList.remove('captured');
+                    const img = el.querySelector('img');
+                    if (img) img.remove();
+                });
+                for (let pose of poses) {
+                    delete capturedBlobs[pose];
+                }
+
+                currentPose = 'Front';
+                switchStudentTab('verify');
+                await loadStudentData();
+            } catch (err) {
+                console.error(err);
+                alert(err.message);
+                btn.disabled = false;
+                btn.textContent = 'Submit Biometrics';
+            } finally {
+                captureBtn.disabled = false;
+            }
+        }
+
+        /* ==================== ADMIN ACTIONS ==================== */
+        
+        async function loadAdminData() {
+            try {
+                // Fetch Overview details
+                const overviewRes = await fetch(`${API_BASE}/admin/overview`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (overviewRes.ok) {
+                    const overview = await overviewRes.json();
+                    document.getElementById('statClasses').textContent = overview.totalClasses;
+                    document.getElementById('statTeachers').textContent = overview.totalTeachers;
+                    document.getElementById('statRegistered').textContent = `${overview.registeredFacesCount} / ${overview.totalStudents}`;
+                    document.getElementById('statRate').textContent = overview.registrationPercentage.toFixed(0) + '%';
+                }
+
+                // Fetch student directory status
+                const studentsRes = await fetch(`${API_BASE}/admin/face-registration-status`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (studentsRes.ok) {
+                    const students = await studentsRes.json();
+                    const tbody = document.getElementById('adminStudentsTableBody');
+                    tbody.innerHTML = '';
+                    
+                    if (students.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No student records found</td></tr>`;
+                    } else {
+                        students.forEach(student => {
+                            const row = document.createElement('tr');
+                            const badge = student.isRegistered ? 
+                                '<span class="badge-pill badge-pill-success">ENROLLED</span>' : 
+                                '<span class="badge-pill badge-pill-fail">NOT ENROLLED</span>';
+                            
+                            row.innerHTML = `
+                                <td>${student.registrationNumber}</td>
+                                <td style="font-weight: 600;">${student.name}</td>
+                                <td>${student.email}</td>
+                                <td>${badge}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+                }
+
+                // Fetch system match logs
+                const logsRes = await fetch(`${API_BASE}/admin/logs`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (logsRes.ok) {
+                    const logs = await logsRes.json();
+                    const tbody = document.getElementById('adminSystemLogsTableBody');
+                    tbody.innerHTML = '';
+                    
+                    if (logs.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No match activities logged yet</td></tr>`;
+                    } else {
+                        logs.forEach(log => {
+                            const row = document.createElement('tr');
+                            const ts = new Date(log.timestamp).toLocaleString();
+                            const verdict = log.verificationResult ? 
+                                '<span class="badge-pill badge-pill-success">PASS</span>' : 
+                                '<span class="badge-pill badge-pill-fail">FAIL</span>';
+                            
+                            row.innerHTML = `
+                                <td style="color: var(--text-muted);">${ts}</td>
+                                <td style="font-weight: 600;">${log.studentName}</td>
+                                <td>${log.studentEmail}</td>
+                                <td>${verdict}</td>
+                                <td style="font-weight: 600;">${(log.similarityScore * 100).toFixed(0)}%</td>
+                                <td>${(log.confidence * 100).toFixed(0)}%</td>
+                                <td>${log.deviceInformation || 'Web Client'}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+                }
+                
+                // Fetch pending registration approvals
+                const approvalsRes = await fetch(`${API_BASE}/admin/registration-requests`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (approvalsRes.ok) {
+                    const reqs = await approvalsRes.json();
+                    const tbody = document.getElementById('adminApprovalsTableBody');
+                    const approvalsCard = document.getElementById('adminPendingApprovalsCard');
+                    tbody.innerHTML = '';
+                    
+                    if (reqs.length === 0) {
+                        approvalsCard.classList.add('hidden');
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No pending permission requests</td></tr>`;
+                    } else {
+                        approvalsCard.classList.remove('hidden');
+                        reqs.forEach(req => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${req.registrationNumber}</td>
+                                <td style="font-weight: 600;">${req.name}</td>
+                                <td>${req.email}</td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="approveStudentRegistration('${req._id}', '${req.name}')" style="width: auto; display: inline-flex; font-size: 0.72rem; padding: 0.35rem 0.75rem; margin-right: 0.5rem; background: var(--emerald); box-shadow: 0 4px 10px var(--emerald-glow); border: none;">
+                                        Approve
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="rejectStudentRegistration('${req._id}', '${req.name}')" style="width: auto; display: inline-flex; font-size: 0.72rem; padding: 0.35rem 0.75rem; color: #fca5a5; border-color: rgba(244, 63, 94, 0.3); background: rgba(244, 63, 94, 0.1);">
+                                        Reject
+                                    </button>
+                                </td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Handle profile creation by admin
+        async function handleCreateStudent(e) {
+            e.preventDefault();
+            const registrationNumber = document.getElementById('regNumber').value;
+            const name = document.getElementById('studentName').value;
+            const email = document.getElementById('studentEmail').value;
+            const password = document.getElementById('studentPass').value;
+            
+            const btn = document.getElementById('btnCreateStudent');
+            const alertBox = document.getElementById('adminFormAlert');
+            
+            btn.disabled = true;
+            btn.textContent = 'Registering Account...';
+            alertBox.classList.add('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/students`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({ registrationNumber, name, email, password })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Failed to create student');
+                }
+
+                // Show success
+                alertBox.textContent = `Student profile created successfully! Log in credentials: ${email} / ${password}`;
+                alertBox.className = 'alert alert-success';
+                
+                // Reset form
+                document.getElementById('regNumber').value = '';
+                document.getElementById('studentName').value = '';
+                document.getElementById('studentEmail').value = '';
+                
+                await loadAdminData();
+            } catch (err) {
+                alertBox.textContent = err.message;
+                alertBox.className = 'alert';
+                alertBox.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Register Student Account';
+            }
+        }
+
+        // Reset Biometrics Database
+        async function triggerResetDatabase() {
+            if (!confirm("Are you sure you want to wipe all registered biometric profiles, system verification logs, and custom students? This action is irreversible.")) {
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/admin/reset-biometrics`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Reset failed');
+                }
+                const data = await res.json();
+                alert(data.message);
+                await loadAdminData();
+            } catch (err) {
+                alert('Database Reset Error: ' + err.message);
+            }
+        }
+
+        // Student request face registration permission
+        async function requestRegistrationPermission() {
+            const btn = document.getElementById('btnRequestPerm');
+            btn.disabled = true;
+            btn.textContent = 'Submitting Request...';
+            try {
+                const res = await fetch(`${API_BASE}/face/request-permission`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Request failed');
+                }
+                const data = await res.json();
+                alert(data.message);
+                await loadStudentData();
+            } catch (err) {
+                alert('Request Error: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = 'Request Face Registration Permission';
+            }
+        }
+
+        // Admin approve face registration permission
+        async function approveStudentRegistration(studentId, name) {
+            try {
+                const res = await fetch(`${API_BASE}/admin/approve-registration/${studentId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Approval failed');
+                }
+                alert(`Face registration permission approved for ${name}.`);
+                await loadAdminData();
+            } catch (err) {
+                alert('Approval Error: ' + err.message);
+            }
+        }
+
+        // Admin reject/revoke face registration permission
+        async function rejectStudentRegistration(studentId, name) {
+            if (!confirm(`Are you sure you want to reject/revoke permission for ${name}?`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/admin/reject-registration/${studentId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Rejection failed');
+                }
+                alert(`Face registration permission rejected for ${name}.`);
+                await loadAdminData();
+            } catch (err) {
+                alert('Rejection Error: ' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
