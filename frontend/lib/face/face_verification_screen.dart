@@ -31,7 +31,6 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
   String _instructionMessage = 'Align your face inside the oval';
   Color _ovalColor = Colors.white;
 
-  // A valid base64 encoded 100x100 gray JPEG image to satisfy backend decoders during mock simulation tests
   static const String _mockJpegBase64 = 
       '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCABkAGQBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
 
@@ -163,7 +162,6 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
 
     final face = faces.first;
     
-    // Check eyes
     final leftEyeOpen = face.leftEyeOpenProbability ?? 1.0;
     final rightEyeOpen = face.rightEyeOpenProbability ?? 1.0;
     
@@ -178,7 +176,6 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     final double yaw = face.headEulerAngleY ?? 0.0;
     final double pitch = face.headEulerAngleX ?? 0.0;
 
-    // Frontal orientation
     final isFrontal = yaw.abs() < 8.0 && pitch.abs() < 8.0;
 
     if (isFrontal) {
@@ -206,6 +203,15 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       final image = await _cameraController!.takePicture();
       final bytes = await image.readAsBytes();
       
+      // Stop and dispose the camera stream as soon as capture finishes to free resource
+      if (_cameraController != null) {
+        await _cameraController!.dispose();
+        _cameraController = null;
+        setState(() {
+          _isCameraInitialized = false;
+        });
+      }
+      
       _submitVerifyBytes(bytes);
     } catch (e) {
       debugPrint('Shutter error: $e');
@@ -215,8 +221,15 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     }
   }
 
-  void _simulateVerify() {
+  void _simulateVerify() async {
     final validBytes = base64Decode(_mockJpegBase64);
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+      _cameraController = null;
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
     _submitVerifyBytes(validBytes);
   }
 
@@ -260,6 +273,14 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     }
   }
 
+  Future<void> _safeExit() async {
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+      _cameraController = null;
+    }
+    _faceDetector?.close();
+  }
+
   @override
   void dispose() {
     _cameraController?.dispose();
@@ -280,115 +301,137 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Verifying ${student.name}'),
-        actions: [
-          Switch(
-            value: _simulatorMode,
-            onChanged: (val) {
-              setState(() {
-                _simulatorMode = val;
-                if (!_simulatorMode) {
-                  _initCamera();
-                } else {
-                  if (!kIsWeb) {
-                    _cameraController?.stopImageStream();
-                  }
-                }
-              });
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          await _safeExit();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Verifying ${student.name}'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              await _safeExit();
+              if (context.mounted) {
+                context.pop();
+              }
             },
           ),
-          const Padding(
-            padding: EdgeInsets.only(right: 8.0),
-            child: Center(child: Text('Sim', style: TextStyle(fontSize: 12))),
-          )
-        ],
-      ),
-      body: faceState.isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Analyzing face biometrics...'),
-                ],
-              ),
+          actions: [
+            Switch(
+              value: _simulatorMode,
+              onChanged: (val) async {
+                if (val) {
+                  if (_cameraController != null) {
+                    await _cameraController!.dispose();
+                    _cameraController = null;
+                    setState(() {
+                      _isCameraInitialized = false;
+                    });
+                  }
+                }
+                setState(() {
+                  _simulatorMode = val;
+                  if (!_simulatorMode) {
+                    _initCamera();
+                  }
+                });
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.only(right: 8.0),
+              child: Center(child: Text('Sim', style: TextStyle(fontSize: 12))),
             )
-          : _showResult
-              ? _buildResultView(faceState, student.name)
-              : Stack(
+          ],
+        ),
+        body: faceState.isLoading
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (_isCameraInitialized && !_simulatorMode)
-                      Positioned.fill(
-                        child: AspectRatio(
-                          aspectRatio: _cameraController!.value.aspectRatio,
-                          child: CameraPreview(_cameraController!),
-                        ),
-                      )
-                    else
-                      Positioned.fill(
-                        child: Container(
-                          color: Colors.black87,
-                          child: const Center(
-                            child: Icon(Icons.videocam_off_rounded, size: 70, color: Colors.white30),
-                          ),
-                        ),
-                      ),
-
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: OvalGuidePainter(
-                          borderColor: _ovalColor,
-                          isFaceDetected: _ovalColor == Colors.green || _ovalColor == Colors.yellow,
-                        ),
-                      ),
-                    ),
-
-                    Positioned(
-                      top: 20,
-                      left: 20,
-                      right: 20,
-                      child: Card(
-                        color: Colors.black.withOpacity(0.7),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                          child: Text(
-                            kIsWeb && !_simulatorMode
-                                ? 'Click the button below to verify your face'
-                                : _instructionMessage,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    if (_simulatorMode)
-                      Positioned(
-                        bottom: 50,
-                        left: 40,
-                        right: 40,
-                        child: ElevatedButton.icon(
-                          onPressed: _simulateVerify,
-                          icon: const Icon(Icons.flash_on_rounded),
-                          label: const Text('Simulate Verification Capture'),
-                        ),
-                      )
-                    else if (kIsWeb && _isCameraInitialized)
-                      Positioned(
-                        bottom: 50,
-                        left: 40,
-                        right: 40,
-                        child: ElevatedButton.icon(
-                          onPressed: _captureAndVerify,
-                          icon: const Icon(Icons.camera_alt_rounded),
-                          label: const Text('Capture & Verify Real Face'),
-                        ),
-                      ),
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Analyzing face biometrics...'),
                   ],
                 ),
+              )
+            : _showResult
+                ? _buildResultView(faceState, student.name)
+                : Stack(
+                    children: [
+                      if (_isCameraInitialized && !_simulatorMode)
+                        Positioned.fill(
+                          child: AspectRatio(
+                            aspectRatio: _cameraController!.value.aspectRatio,
+                            child: CameraPreview(_cameraController!),
+                          ),
+                        )
+                      else
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black87,
+                            child: const Center(
+                              child: Icon(Icons.videocam_off_rounded, size: 70, color: Colors.white30),
+                            ),
+                          ),
+                        ),
+
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: OvalGuidePainter(
+                            borderColor: _ovalColor,
+                            isFaceDetected: _ovalColor == Colors.green || _ovalColor == Colors.yellow,
+                          ),
+                        ),
+                      ),
+
+                      Positioned(
+                        top: 20,
+                        left: 20,
+                        right: 20,
+                        child: Card(
+                          color: Colors.black.withOpacity(0.7),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            child: Text(
+                              kIsWeb && !_simulatorMode
+                                  ? 'Click the button below to verify your face'
+                                  : _instructionMessage,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      if (_simulatorMode)
+                        Positioned(
+                          bottom: 50,
+                          left: 40,
+                          right: 40,
+                          child: ElevatedButton.icon(
+                            onPressed: _simulateVerify,
+                            icon: const Icon(Icons.flash_on_rounded),
+                            label: const Text('Simulate Verification Capture'),
+                          ),
+                        )
+                      else if (kIsWeb && _isCameraInitialized)
+                        Positioned(
+                          bottom: 50,
+                          left: 40,
+                          right: 40,
+                          child: ElevatedButton.icon(
+                            onPressed: _captureAndVerify,
+                            icon: const Icon(Icons.camera_alt_rounded),
+                            label: const Text('Capture & Verify Real Face'),
+                          ),
+                        ),
+                    ],
+                  ),
+      ),
     );
   }
 
@@ -448,9 +491,12 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
           ),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: () {
+            onPressed: () async {
+              await _safeExit();
               ref.read(studentProvider.notifier).reset();
-              context.go('/select-class');
+              if (mounted) {
+                context.go('/select-class');
+              }
             },
             child: const Text('Back to Home'),
           ),
