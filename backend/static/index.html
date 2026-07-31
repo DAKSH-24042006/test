@@ -809,8 +809,7 @@
             <div class="control-panel">
                 
                 <div class="panel-nav">
-                    <div class="nav-tab active" id="tabVerify" onclick="switchStudentTab('verify')">Face Match / Verify</div>
-                    <div class="nav-tab" id="tabRegister" onclick="switchStudentTab('register')">Biometrics Enrollment</div>
+                    <div class="nav-tab active" id="tabVerify">Face Match / Verify</div>
                 </div>
 
                 <!-- Tab Verify -->
@@ -883,66 +882,6 @@
                     </div>
                 </div>
 
-                <!-- Tab Register -->
-                <div id="contentRegister" class="tab-content hidden">
-                    <!-- Permission lock screen -->
-                    <div id="registerLockArea" class="hidden" style="text-align: center; padding: 2rem 1rem; border: 1px dashed var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.1);">
-                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.5;">
-                            Face registration is locked. You must submit a request and receive administrative approval before registering your face.
-                        </p>
-                        <button class="btn btn-primary" id="btnRequestPerm" onclick="requestRegistrationPermission()">
-                            Request Face Registration Permission
-                        </button>
-                    </div>
-
-                    <!-- Pending permission screen -->
-                    <div id="registerPendingArea" class="hidden" style="text-align: center; padding: 2rem 1rem; border: 1px dashed var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.1);">
-                        <div class="spinner" style="margin: 0 auto 1.25rem;"></div>
-                        <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">
-                            Your permission request is pending. Please wait for an administrator to approve it.
-                        </p>
-                    </div>
-
-                    <!-- Main active enrollment controls -->
-                    <div id="registerActiveArea" class="hidden">
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.45;">
-                            Capture all 7 required pose pictures in order to register a biometric face verification template on the server.
-                        </p>
-
-                        <div class="pose-grid">
-                            <div class="pose-item active" id="pose_Front" onclick="selectPose('Front')">
-                                <span>Front</span>
-                            </div>
-                            <div class="pose-item" id="pose_Left" onclick="selectPose('Left')">
-                                <span>Left</span>
-                            </div>
-                            <div class="pose-item" id="pose_Right" onclick="selectPose('Right')">
-                                <span>Right</span>
-                            </div>
-                            <div class="pose-item" id="pose_Up" onclick="selectPose('Up')">
-                                <span>Up</span>
-                            </div>
-                            <div class="pose-item" id="pose_Down" onclick="selectPose('Down')">
-                                <span>Down</span>
-                            </div>
-                            <div class="pose-item" id="pose_Smile" onclick="selectPose('Smile')">
-                                <span>Smile</span>
-                            </div>
-                            <div class="pose-item" id="pose_Neutral" onclick="selectPose('Neutral')">
-                                <span>Neutral</span>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                            <button class="btn btn-secondary" style="flex: 1;" id="btnCapturePose" onclick="captureCurrentPose()">
-                                Capture Snapshot
-                            </button>
-                            <button class="btn btn-primary" style="flex: 1.2;" id="btnSubmitReg" disabled onclick="submitRegistration()">
-                                Submit Biometrics
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -1129,6 +1068,39 @@
 
         </div>
 
+    </div>
+
+    <!-- Admin Camera Modal -->
+    <div id="adminCameraModal" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(8, 12, 20, 0.95); z-index: 1000; display: flex; justify-content: center; align-items: center; padding: 1.5rem;">
+        <div class="glass-card" style="max-width: 550px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1.25rem; padding: 2rem;">
+            <div class="card-header-bar" style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 id="adminModalTitle" style="margin-bottom: 0;">Enroll Face</h4>
+                <button class="btn btn-secondary" onclick="closeAdminEnrollment()" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.75rem; margin: 0;">Close</button>
+            </div>
+            
+            <div class="camera-wrapper" style="width: 100%; aspect-ratio: 4/3; max-width: 420px;">
+                <video id="adminWebcam" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                <div id="adminOvalGuide" class="oval-guide"></div>
+                <div id="adminFlashOverlay" class="flash-overlay"></div>
+            </div>
+            
+            <p id="adminCamStatus" style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: -0.5rem;">Initializing Camera Feed...</p>
+            
+            <div class="pose-grid" style="width: 100%;">
+                <div class="pose-item active" id="adminPose_Front" onclick="selectAdminPose('Front')"><span>Front</span></div>
+                <div class="pose-item" id="adminPose_Left" onclick="selectAdminPose('Left')"><span>Left</span></div>
+                <div class="pose-item" id="adminPose_Right" onclick="selectAdminPose('Right')"><span>Right</span></div>
+                <div class="pose-item" id="adminPose_Up" onclick="selectAdminPose('Up')"><span>Up</span></div>
+                <div class="pose-item" id="adminPose_Down" onclick="selectAdminPose('Down')"><span>Down</span></div>
+                <div class="pose-item" id="adminPose_Smile" onclick="selectAdminPose('Smile')"><span>Smile</span></div>
+                <div class="pose-item" id="adminPose_Neutral" onclick="selectAdminPose('Neutral')"><span>Neutral</span></div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; width: 100%;">
+                <button class="btn btn-secondary" style="flex: 1;" onclick="captureAdminPose()">Capture Pose</button>
+                <button class="btn btn-primary" style="flex: 1.2;" id="adminSubmitBtn" disabled onclick="submitAdminEnrollment()">Submit Biometrics</button>
+            </div>
+        </div>
     </div>
 
     <!-- Hidden canvas for video captures -->
@@ -1674,15 +1646,26 @@
                     } else {
                         students.forEach(student => {
                             const row = document.createElement('tr');
-                            const badge = student.isRegistered ? 
-                                '<span class="badge-pill badge-pill-success">ENROLLED</span>' : 
-                                '<span class="badge-pill badge-pill-fail">NOT ENROLLED</span>';
+                            const statusBadge = student.isRegistered ? 
+                                '<span class="badge-pill badge-pill-success" style="margin-right: 0.75rem;">ENROLLED</span>' : 
+                                '<span class="badge-pill badge-pill-fail" style="margin-right: 0.75rem;">NOT ENROLLED</span>';
+                            
+                            const enrollBtn = `
+                                <button class="btn btn-secondary" onclick="startAdminEnrollment('${student.studentId}', '${student.name}')" style="width: auto; display: inline-flex; padding: 0.3rem 0.65rem; font-size: 0.7rem; border-color: rgba(99,102,241,0.3); margin: 0;">
+                                    ${student.isRegistered ? 'Re-Enroll Face' : 'Enroll Face'}
+                                </button>
+                            `;
                             
                             row.innerHTML = `
                                 <td>${student.registrationNumber}</td>
                                 <td style="font-weight: 600;">${student.name}</td>
                                 <td>${student.className || 'Unknown'}</td>
-                                <td>${badge}</td>
+                                <td>
+                                    <div style="display: flex; align-items: center;">
+                                        ${statusBadge}
+                                        ${enrollBtn}
+                                    </div>
+                                </td>
                             `;
                             tbody.appendChild(row);
                         });
@@ -1951,6 +1934,153 @@
                 await loadAdminData();
             } catch (err) {
                 alert('Rejection Error: ' + err.message);
+            }
+        }
+        // Admin-side Face Enrollment Modal Handlers
+        let currentEnrollmentStudentId = null;
+        let adminWebcamStream = null;
+
+        async function startAdminEnrollment(studentId, name) {
+            currentEnrollmentStudentId = studentId;
+            document.getElementById('adminModalTitle').textContent = `Enroll Face: ${name}`;
+            
+            // Clear previous captured photos
+            for (let pose of poses) {
+                delete capturedBlobs[pose];
+            }
+            currentPose = 'Front';
+            
+            // Open modal
+            document.getElementById('adminCameraModal').classList.remove('hidden');
+            updateAdminPoseUI();
+            
+            // Start webcam
+            await initAdminWebcam();
+        }
+
+        async function initAdminWebcam() {
+            const video = document.getElementById('adminWebcam');
+            const statusText = document.getElementById('adminCamStatus');
+            try {
+                adminWebcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = adminWebcamStream;
+                statusText.textContent = 'Active Camera Feed — Align face in oval';
+                statusText.style.color = 'var(--emerald)';
+            } catch (err) {
+                console.error(err);
+                statusText.textContent = 'Error: Camera feed access denied.';
+                statusText.style.color = 'var(--error)';
+            }
+        }
+
+        function closeAdminEnrollment() {
+            if (adminWebcamStream) {
+                adminWebcamStream.getTracks().forEach(track => track.stop());
+                adminWebcamStream = null;
+            }
+            document.getElementById('adminCameraModal').classList.add('hidden');
+            currentEnrollmentStudentId = null;
+        }
+
+        function selectAdminPose(poseName) {
+            currentPose = poseName;
+            updateAdminPoseUI();
+        }
+
+        function updateAdminPoseUI() {
+            document.querySelectorAll('#adminCameraModal .pose-item').forEach(el => {
+                el.classList.remove('active');
+                el.classList.remove('captured');
+                const img = el.querySelector('img');
+                if (img) img.remove();
+                
+                const pose = el.id.replace('adminPose_', '');
+                if (pose === currentPose) {
+                    el.classList.add('active');
+                }
+                if (capturedBlobs[pose]) {
+                    el.classList.add('captured');
+                    
+                    const thumbnail = document.createElement('img');
+                    thumbnail.className = 'thumbnail';
+                    thumbnail.src = URL.createObjectURL(capturedBlobs[pose]);
+                    el.appendChild(thumbnail);
+                }
+            });
+
+            const oval = document.getElementById('adminOvalGuide');
+            if (capturedBlobs[currentPose]) {
+                oval.className = 'oval-guide active';
+            } else {
+                oval.className = 'oval-guide';
+            }
+
+            const allCaptured = poses.every(p => capturedBlobs[p]);
+            document.getElementById('adminSubmitBtn').disabled = !allCaptured;
+        }
+
+        function captureAdminPose() {
+            const video = document.getElementById('adminWebcam');
+            const canvas = document.getElementById('photoCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            
+            // Flash effect
+            const flash = document.getElementById('adminFlashOverlay');
+            flash.classList.add('flash-active');
+            setTimeout(() => flash.classList.remove('flash-active'), 200);
+
+            canvas.toBlob((blob) => {
+                capturedBlobs[currentPose] = blob;
+                
+                const currentIdx = poses.indexOf(currentPose);
+                if (currentIdx < poses.length - 1) {
+                    currentPose = poses[currentIdx + 1];
+                }
+                updateAdminPoseUI();
+            }, 'image/jpeg', 0.95);
+        }
+
+        async function submitAdminEnrollment() {
+            const btn = document.getElementById('adminSubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting Vectors...';
+
+            const formData = new FormData();
+            formData.append('student_id', currentEnrollmentStudentId);
+            for (let pose of poses) {
+                formData.append('images', capturedBlobs[pose], `${pose.toLowerCase()}.jpg`);
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/register-face`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Biometrics submission failed');
+                }
+
+                alert('Biometric parameters registered successfully for the student!');
+                closeAdminEnrollment();
+                await loadAdminData();
+            } catch (err) {
+                console.error(err);
+                alert(err.message);
+                btn.disabled = false;
+                btn.textContent = 'Submit Biometrics';
             }
         }
     </script>
