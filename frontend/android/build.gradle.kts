@@ -20,14 +20,14 @@ subprojects {
 }
 
 subprojects {
-    afterEvaluate {
-        if (project.plugins.hasPlugin("com.android.application") ||
-            project.plugins.hasPlugin("com.android.library")) {
-            val android = project.extensions.findByName("android")
+    val configureNamespace = Action<Project> {
+        if (plugins.hasPlugin("com.android.application") ||
+            plugins.hasPlugin("com.android.library")) {
+            val android = extensions.findByName("android")
             if (android != null) {
                 val baseExtension = android as? com.android.build.gradle.BaseExtension
                 if (baseExtension != null && baseExtension.namespace == null) {
-                    val manifestFile = project.file("src/main/AndroidManifest.xml")
+                    val manifestFile = file("src/main/AndroidManifest.xml")
                     if (manifestFile.exists()) {
                         val manifestXml = manifestFile.readText()
                         val matcher = java.util.regex.Pattern.compile("package=\"([^\"]+)\"").matcher(manifestXml)
@@ -38,6 +38,12 @@ subprojects {
                 }
             }
         }
+    }
+    
+    if (state.executed) {
+        configureNamespace.execute(this)
+    } else {
+        afterEvaluate(configureNamespace)
     }
 }
 
