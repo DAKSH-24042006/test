@@ -62,13 +62,13 @@ class KioskNotifier extends StateNotifier<KioskState> {
     }
   }
 
-  Future<void> selectClass(ClassModel clazz) async {
+  void selectClass(ClassModel clazz) {
     state = state.copyWith(
       selectedClass: clazz,
       selectedStudent: null,
       students: [],
     );
-    await fetchStudents(clazz.classId);
+    fetchStudents(clazz.classId);
   }
 
   Future<void> fetchStudents(String classId) async {

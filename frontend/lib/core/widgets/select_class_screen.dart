@@ -113,11 +113,9 @@ class _SelectClassScreenState extends ConsumerState<SelectClassScreen> {
                               ),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
-                                onTap: () async {
-                                  await ref.read(studentProvider.notifier).selectClass(clazz);
-                                  if (mounted) {
-                                    context.push('/search-student');
-                                  }
+                                onTap: () {
+                                  ref.read(studentProvider.notifier).selectClass(clazz);
+                                  context.push('/search-student');
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.all(20.0),

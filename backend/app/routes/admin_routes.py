@@ -273,11 +273,13 @@ async def get_face_registration_status(current_admin: dict = Depends(get_current
     status_list = []
     for student in students:
         emb_docs = await embedding_repo.get_by_student_id(student["student_id"])
+        clazz = await class_repo.get_by_id(student["class_id"])
+        class_name = clazz["class_name"] if clazz else "Unknown"
         status_list.append({
             "studentId": student["student_id"],
             "registrationNumber": student["reg_no"],
             "name": student["name"],
-            "email": f"{student['reg_no'].lower()}@smart.edu",
+            "className": class_name,
             "isRegistered": len(emb_docs) > 0
         })
     return status_list
