@@ -26,13 +26,16 @@ subprojects {
             val android = extensions.findByName("android")
             if (android != null) {
                 val baseExtension = android as? com.android.build.gradle.BaseExtension
-                if (baseExtension != null && baseExtension.namespace == null) {
-                    val manifestFile = file("src/main/AndroidManifest.xml")
-                    if (manifestFile.exists()) {
-                        val manifestXml = manifestFile.readText()
-                        val matcher = java.util.regex.Pattern.compile("package=\"([^\"]+)\"").matcher(manifestXml)
-                        if (matcher.find()) {
-                            baseExtension.namespace = matcher.group(1)
+                if (baseExtension != null) {
+                    baseExtension.compileSdkVersion(36)
+                    if (baseExtension.namespace == null) {
+                        val manifestFile = file("src/main/AndroidManifest.xml")
+                        if (manifestFile.exists()) {
+                            val manifestXml = manifestFile.readText()
+                            val matcher = java.util.regex.Pattern.compile("package=\"([^\"]+)\"").matcher(manifestXml)
+                            if (matcher.find()) {
+                                baseExtension.namespace = matcher.group(1)
+                            }
                         }
                     }
                 }
