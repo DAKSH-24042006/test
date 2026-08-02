@@ -114,6 +114,7 @@ async def verify_student_face(
             message="Face matched and verified successfully." if verified else "Face match mismatch."
         )
     except ValueError as ve:
+        logger.warning(f"Verification ValueError: {ve}")
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Error during verification pipeline: {e}")

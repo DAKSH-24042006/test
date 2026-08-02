@@ -47,6 +47,14 @@ class MockCursor:
         if key == "timestamp":
             self.docs.sort(key=lambda x: x.get("timestamp") or 0, reverse=(direction == -1))
         return self
+
+    def limit(self, count):
+        self.docs = self.docs[:count]
+        return self
+
+    def skip(self, count):
+        self.docs = self.docs[count:]
+        return self
     
     def __aiter__(self):
         return self
