@@ -391,8 +391,8 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                             child: Text(
-                              kIsWeb && !_simulatorMode
-                                  ? 'Click the button below to verify your face'
+                              !_simulatorMode
+                                  ? 'Align your face and tap the button below'
                                   : _instructionMessage,
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
@@ -412,7 +412,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
                             label: const Text('Simulate Verification Capture'),
                           ),
                         )
-                      else if (kIsWeb && _isCameraInitialized)
+                      else if (_isCameraInitialized)
                         Positioned(
                           bottom: 50,
                           left: 40,
