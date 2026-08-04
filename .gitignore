@@ -115,4 +115,8 @@ venv.bak/
 **/doc/api/
 ios/Flutter/ephemeral/
 android/app/src/main/java/io/flutter/plugins/
+build/
+**/build/
+*.env
+
 # Keep pubspec.lock since this is an application.

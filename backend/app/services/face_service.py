@@ -6,6 +6,8 @@ from typing import List, Optional, Dict, Any, Tuple
 from backend.app.database.connection import settings
 from backend.app.repositories.embedding_repository import EmbeddingRepository
 from backend.app.services.cache_manager import ClassCacheManager
+from backend.app.services.anti_spoofing_service import AntiSpoofingService
+from backend.app.services.liveness_session import LivenessSessionManager
 
 logger = logging.getLogger("face_service")
 
@@ -27,6 +29,7 @@ except Exception as e:
 class FaceService:
     def __init__(self):
         self.embedding_repo = EmbeddingRepository()
+        self.anti_spoofing_service = AntiSpoofingService()
 
     def _bytes_to_cv2(self, image_bytes: bytes) -> np.ndarray:
         nparr = np.frombuffer(image_bytes, np.uint8)
@@ -66,15 +69,15 @@ class FaceService:
         
         # 1. Check brightness & darkness
         mean_brightness = np.mean(gray)
-        if mean_brightness < 40:
+        if mean_brightness < 20:
             return False, f"Image is too dark (brightness: {mean_brightness:.1f}). Please improve lighting."
-        if mean_brightness > 225:
+        if mean_brightness > 245:
             return False, f"Image is too bright (brightness: {mean_brightness:.1f}). Please avoid direct light glare."
 
-        # 2. Check blur (variance of Laplacian)
+        # 2. Check extreme blur (only reject unreadable out-of-focus images)
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
-        if blur_score < 45.0:
-            return False, f"Image is blurry (blur score: {blur_score:.1f}). Please keep the camera still."
+        if blur_score < 10.0:
+            return False, f"Image is extremely blurry (blur score: {blur_score:.1f}). Please hold phone steady."
 
         # If a face object is provided (InsightFace detected it)
         if face is not None:
@@ -84,24 +87,8 @@ class FaceService:
             face_h = bbox[3] - bbox[1]
             img_h, img_w = img.shape[:2]
 
-            if face_w < 80 or face_h < 80 or (face_w / img_w) < 0.15:
-                return False, f"Face is too far / small (dimensions: {face_w:.0f}x{face_h:.0f}). Please move closer."
-
-            # 4. Check eyes open (contrast-based heuristic around keypoints)
-            kps = face.kps  # 5 keypoints: [left_eye, right_eye, nose, left_mouth, right_mouth]
-            if kps is not None and len(kps) >= 2:
-                for i, eye_name in enumerate(["Left Eye", "Right Eye"]):
-                    ex, ey = int(kps[i][0]), int(kps[i][1])
-                    if 0 <= ex < img_w and 0 <= ey < img_h:
-                        # Extract a small window around the eye center
-                        patch = img[max(0, ey-6):min(img_h, ey+6), max(0, ex-6):min(img_w, ex+6)]
-                        if patch.size > 0:
-                            gray_patch = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
-                            std_dev = np.std(gray_patch)
-                            # Closed eyes have low contrast/std-dev (skin matches skin)
-                            # Open eyes have high contrast (white sclera vs dark iris/pupil)
-                            if std_dev < 3.5:
-                                return False, f"Closed eyes or low eye contrast detected in {eye_name}. Please blink and try again."
+            if face_w < 60 or face_h < 60 or (face_w / img_w) < 0.10:
+                return False, f"Face is too far (dimensions: {face_w:.0f}x{face_h:.0f}). Please move closer."
 
         return True, ""
 
@@ -246,3 +233,113 @@ class FaceService:
 
         time_taken = time.time() - start_time
         return verified, max_similarity, confidence, time_taken
+
+    async def verify_face_with_liveness(
+        self,
+        student_id: str,
+        class_id: str,
+        session_id: str,
+        frames_bytes: List[bytes]
+    ) -> Tuple[bool, bool, bool, float, float, float, str, Dict[str, Any]]:
+        """
+        Processes multi-frame scanning input, checks session validity, anti-spoofing / liveness,
+        single-face constraints across all frames, and face verification matching.
+        Returns: (verified, liveness_passed, anti_spoof_passed, similarity_score, confidence, time_taken, message, details)
+        """
+        start_time = time.time()
+
+        # 1. Session Validation
+        session_valid, session_err, session = LivenessSessionManager.validate_session(session_id, student_id)
+        if not session_valid:
+            raise ValueError(session_err)
+
+        # Mark session used immediately to prevent replay
+        LivenessSessionManager.mark_used(session_id)
+
+        # 2. Check frame count limits
+        if len(frames_bytes) < settings.MIN_LIVENESS_FRAMES:
+            raise ValueError(f"Insufficient frames captured for liveness scan (received {len(frames_bytes)}, minimum {settings.MIN_LIVENESS_FRAMES} required).")
+        if len(frames_bytes) > settings.MAX_LIVENESS_FRAMES:
+            frames_bytes = frames_bytes[:settings.MAX_LIVENESS_FRAMES]
+
+        # 3. Decode images and detect faces
+        cv2_frames = []
+        detected_faces = []
+
+        for idx, frame_b in enumerate(frames_bytes):
+            img = self._bytes_to_cv2(frame_b)
+            if img is None or img.size == 0:
+                raise ValueError(f"Frame #{idx+1} could not be decoded.")
+            cv2_frames.append(img)
+
+            if INSIGHTFACE_AVAILABLE:
+                faces = self._detect_faces_real(img)
+                if len(faces) == 0:
+                    raise ValueError(f"No face detected in scan frame #{idx+1}. Ensure face remains visible.")
+                if len(faces) > 1:
+                    raise ValueError(f"Multiple faces detected in scan frame #{idx+1}. Only single face is allowed.")
+                detected_faces.append(faces[0])
+
+        # 4. Run Anti-Spoofing & Liveness Pipeline
+        anti_spoof_res = self.anti_spoofing_service.run_full_pipeline(
+            frames=cv2_frames,
+            face_objects=detected_faces if INSIGHTFACE_AVAILABLE else None
+        )
+
+        liveness_passed = anti_spoof_res["is_live"]
+        anti_spoof_passed = anti_spoof_res["is_live"]
+
+        if not liveness_passed:
+            reasons = "; ".join(anti_spoof_res.get("rejection_reasons", ["Liveness check failed"]))
+            time_taken = time.time() - start_time
+            return False, False, False, 0.0, 0.0, time_taken, f"Anti-spoofing / Liveness failed: {reasons}", anti_spoof_res
+
+        # 5. Extract embedding from best/middle frame
+        best_idx = len(cv2_frames) // 2
+        best_img = cv2_frames[best_idx]
+
+        if INSIGHTFACE_AVAILABLE:
+            best_face = detected_faces[best_idx]
+            det_score = float(getattr(best_face, "det_score", 0.0))
+            if det_score < settings.FACE_DETECTION_THRESHOLD:
+                raise ValueError(f"Low face detection confidence ({det_score:.2f}). Please scan again in good lighting.")
+
+            is_valid, err_msg = self.validate_image_quality(best_img, best_face)
+            if not is_valid:
+                raise ValueError(f"Scan quality check failed: {err_msg}")
+
+            live_emb = best_face.embedding.tolist()
+        else:
+            is_valid, err_msg = self.validate_image_quality(best_img)
+            if not is_valid:
+                raise ValueError(f"Scan quality check failed: {err_msg}")
+
+            live_emb = self._extract_embedding_fallback(student_id, 0)
+
+        # 6. Fetch cached student embeddings & Match
+        cached_embeddings = await ClassCacheManager.get_student_embeddings(class_id, student_id)
+        if not cached_embeddings:
+            await ClassCacheManager.load_class_into_cache(class_id)
+            cached_embeddings = await ClassCacheManager.get_student_embeddings(class_id, student_id)
+
+            if not cached_embeddings:
+                raise ValueError("No registered face profile found for this student.")
+
+        max_similarity = -1.0
+        for emb in cached_embeddings:
+            sim = self.calculate_cosine_similarity(live_emb, emb)
+            if sim > max_similarity:
+                max_similarity = sim
+
+        threshold = settings.FACE_SIMILARITY_THRESHOLD
+        verified = max_similarity >= threshold
+
+        if verified:
+            confidence = float(np.clip((max_similarity - threshold) / (1.0 - threshold) * 0.5 + 0.5, 0.0, 1.0))
+        else:
+            confidence = float(np.clip((max_similarity + 1.0) / (threshold + 1.0) * 0.5, 0.0, 1.0))
+
+        time_taken = time.time() - start_time
+        msg = "Liveness and biometric verification passed successfully." if verified else "Liveness passed, but biometric identity mismatch."
+
+        return verified, liveness_passed, anti_spoof_passed, max_similarity, confidence, time_taken, msg, anti_spoof_res
