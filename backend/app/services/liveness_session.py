@@ -88,17 +88,18 @@ class LivenessSessionManager:
     _cleanup_interval: float = 30.0  # Cleanup every 30 seconds
 
     @classmethod
-    def create_session(cls, student_id: str, num_challenges: int = 2) -> LivenessSession:
+    def create_session(cls, student_id: str, num_challenges: int = 0) -> LivenessSession:
         """
-        Creates a new liveness session with a randomized challenge sequence.
+        Creates a new liveness session for passive biometric scanning.
         
         Args:
             student_id: The student being verified
-            num_challenges: Number of challenges to include (2-3 recommended)
+            num_challenges: Number of challenges (0 for seamless passive verification)
             
         Returns:
-            LivenessSession with challenges and session metadata
+            LivenessSession with session metadata and nonces
         """
+
         # Periodic cleanup of expired sessions
         cls._cleanup_expired()
 

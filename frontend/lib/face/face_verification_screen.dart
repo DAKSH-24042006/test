@@ -248,52 +248,41 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     }
 
     _sessionId = sessionRes['session_id'] as String?;
-    _challengeDescriptions = (sessionRes['challenge_descriptions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
 
-    // Step 2: Multi-Frame Capture Flow with Interactive Challenges
+    // Step 2: Seamless Passive Multi-Frame Burst Scan
     try {
-      // Frame 1: Frontal Neutral
       setState(() {
-        _instructionMessage = '1/3: Hold still, looking straight ahead...';
+        _instructionMessage = 'Analyzing biometric liveness... Hold still';
         _scanProgress = 0.25;
         _ovalColor = Colors.cyan;
       });
-      await Future.delayed(const Duration(milliseconds: 1200));
       await _captureFrame();
+      await Future.delayed(const Duration(milliseconds: 120));
 
-      // Step 3: Challenge 1 (e.g. Blink or Turn Head)
-      if (_challengeDescriptions.isNotEmpty) {
-        setState(() {
-          _instructionMessage = '2/3: ${_challengeDescriptions[0]}';
-          _scanProgress = 0.50;
-          _ovalColor = Colors.lightBlueAccent;
-        });
-        await Future.delayed(const Duration(milliseconds: 2500));
-        await _captureFrame();
-      }
-
-      // Step 4: Challenge 2
-      if (_challengeDescriptions.length > 1) {
-        setState(() {
-          _instructionMessage = '3/3: ${_challengeDescriptions[1]}';
-          _scanProgress = 0.75;
-          _ovalColor = Colors.purpleAccent;
-        });
-        await Future.delayed(const Duration(milliseconds: 2500));
-        await _captureFrame();
-      }
-
-      // Frame N: Final Verification Alignment
       setState(() {
-        _instructionMessage = 'Finalizing scan & analyzing anti-spoofing...';
-        _scanProgress = 0.90;
+        _scanProgress = 0.50;
+        _ovalColor = Colors.lightBlueAccent;
+      });
+      await _captureFrame();
+      await Future.delayed(const Duration(milliseconds: 120));
+
+      setState(() {
+        _scanProgress = 0.75;
+        _ovalColor = Colors.purpleAccent;
+      });
+      await _captureFrame();
+      await Future.delayed(const Duration(milliseconds: 120));
+
+      setState(() {
+        _instructionMessage = 'Verifying identity & anti-spoofing...';
+        _scanProgress = 0.95;
         _ovalColor = Colors.greenAccent;
       });
-      await Future.delayed(const Duration(milliseconds: 500));
       await _captureFrame();
 
-      // Submit captured frames for liveness + anti-spoofing + biometric matching
+      // Submit captured frames for passive liveness + anti-spoofing + biometric matching
       _submitLivenessScan();
+
 
     } catch (e) {
       debugPrint('Scan capture error: $e');
