@@ -4,36 +4,6 @@ import 'package:smart_attendance/core/services/dio_client.dart';
 class FaceRepository {
   final DioClient _client = DioClient();
 
-  Future<Map<String, dynamic>> verifyFace({
-    required List<int> imageBytes,
-    required String studentId,
-    required String classId,
-    required String deviceInfo,
-  }) async {
-    try {
-      final formData = FormData.fromMap({
-        'student_id': studentId,
-        'class_id': classId,
-        'image': MultipartFile.fromBytes(
-          imageBytes,
-          filename: 'verify.jpg',
-          contentType: DioMediaType('image', 'jpeg'),
-        ),
-        'device_info': deviceInfo,
-      });
-
-      final response = await _client.dio.post(
-        '/verify',
-        data: formData,
-        options: Options(contentType: 'multipart/form-data'),
-      );
-
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw handleDioError(e);
-    }
-  }
-
   Future<Map<String, dynamic>> startLivenessSession(String studentId) async {
     try {
       final response = await _client.dio.post(
@@ -50,6 +20,7 @@ class FaceRepository {
     required String studentId,
     required String classId,
     required String sessionId,
+    required String nonce,
     required List<List<int>> framesBytes,
     required String deviceInfo,
   }) async {
@@ -67,6 +38,7 @@ class FaceRepository {
         'student_id': studentId,
         'class_id': classId,
         'session_id': sessionId,
+        'nonce': nonce,
         'images': imageFiles,
         'device_info': deviceInfo,
       });

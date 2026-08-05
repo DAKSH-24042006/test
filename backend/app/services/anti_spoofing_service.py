@@ -184,15 +184,15 @@ class AntiSpoofingService:
             high_freq_region = magnitude.copy()
             high_freq_region[~mask_high] = 0
 
-            # Threshold for peak detection
-            peak_threshold = np.mean(high_freq_region[mask_high]) + 3.0 * np.std(high_freq_region[mask_high])
+            # Threshold for peak detection (screen moiré produces extreme frequency spikes)
+            peak_threshold = np.mean(high_freq_region[mask_high]) + 5.0 * np.std(high_freq_region[mask_high])
             peak_count = np.sum(high_freq_region > peak_threshold)
 
             # Moiré patterns create multiple symmetric sharp peaks in high frequencies.
-            # Real camera images have high-frequency content from hair/skin, but NOT sharp periodic peaks.
-            peak_score = min(1.0, peak_count / 150.0)
-            has_moire = peak_count >= 120 and peak_score > 0.80
-            moire_score = peak_score if has_moire else peak_score * 0.4
+            # Real camera images have high-frequency content from hair/skin, but NOT sharp periodic spikes.
+            peak_score = min(1.0, peak_count / 300.0)
+            has_moire = peak_count >= 250 and peak_score > 0.85
+            moire_score = peak_score if has_moire else peak_score * 0.3
 
             if has_moire:
                 logger.info(f"Moiré pattern detected: score={moire_score:.3f}, peaks={peak_count}")
@@ -235,18 +235,18 @@ class AntiSpoofingService:
             mean_diff = np.mean(diffs)
             std_diff = np.std(diffs)
 
-            # Check 1: Too little movement (true frozen/synthetic image)
-            if mean_diff < 0.1:
+            # Check 1: Extremely frozen/synthetic duplicate frame
+            if mean_diff < 0.001:
                 return False, mean_diff, "static_image_suspected"
 
             # Check 2: Unnaturally uniform differences (looped video replay)
-            if len(diffs) >= 3 and std_diff < 0.05 and mean_diff < 1.0:
+            if len(diffs) >= 3 and std_diff < 0.005 and mean_diff < 0.1:
                 return False, std_diff, "looped_video_suspected"
 
             # Check 3: Compute structural similarity between first and last frame
             correlation = np.corrcoef(grays[0].flatten(), grays[-1].flatten())[0, 1]
 
-            if correlation > 0.9999 and mean_diff < 0.2:
+            if correlation > 0.99999 and mean_diff < 0.05:
                 return False, correlation, "near_identical_frames"
 
             # Natural micro-movement score (higher = more likely real)
@@ -311,12 +311,12 @@ class AntiSpoofingService:
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect = max(w, h) / (min(w, h) + 1e-6)
 
-                # Screen reflections are typically high-solidity, low-aspect-ratio large bright regions
-                if solidity > 0.88 and aspect < 2.5 and area > 1000:
+                # Screen reflections are typically high-solidity, compact, large bright regions (>2000 px)
+                if solidity > 0.90 and aspect < 2.2 and area > 2000:
                     suspicious_count += 1
 
-            has_suspicious = suspicious_count >= 2
-            reflection_score = min(1.0, suspicious_count / 2.0)
+            has_suspicious = suspicious_count >= 3
+            reflection_score = min(1.0, suspicious_count / 3.0)
 
             return has_suspicious, reflection_score
 
@@ -491,12 +491,14 @@ class AntiSpoofingService:
         result["overall_score"] = float(np.mean(scores)) if scores else 0.5
         result["rejection_reasons"] = rejections
 
+        has_no_rejections = len(rejections) == 0
+
         if ANTI_SPOOF_AVAILABLE and ANTI_SPOOF_MODEL is not None:
-            # When ONNX deep-learning model is available, use model decision + heuristics
-            result["is_live"] = model_live and (result["overall_score"] >= 0.45)
+            # When ONNX deep-learning model is available, use model decision + no rejections + score threshold
+            result["is_live"] = model_live and has_no_rejections and (result["overall_score"] >= 0.45)
         else:
-            # Heuristic-only mode: pass if overall composite score meets threshold
-            result["is_live"] = result["overall_score"] >= 0.45
+            # Heuristic-only mode: pass if no rejection flags and overall composite score meets threshold
+            result["is_live"] = has_no_rejections and (result["overall_score"] >= 0.45)
 
         if not result["is_live"]:
             logger.warning(f"Anti-spoofing rejected: score={result['overall_score']:.3f}, reasons={rejections}")

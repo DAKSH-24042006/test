@@ -86,61 +86,6 @@ async def get_kiosk_students(class_id: str = Query(..., alias="class")):
     students = await student_repo.list_by_class(class_id)
     return [StudentResponseItem(**s) for s in students]
 
-@router.post("/verify", response_model=VerifyResponse)
-async def verify_student_face(
-    student_id: str = Form(...),
-    class_id: str = Form(...),
-    image: UploadFile = File(...),
-    device_info: str = Form("Kiosk Mobile App")
-):
-    """
-    Kiosk Endpoint: Perform 1:1 face verification using RAM cache.
-    Logs the result to MongoDB.
-    """
-    # Verify student exists
-    student = await student_repo.get_by_id(student_id)
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-
-    if not image.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Uploaded file is not an image.")
-        
-    image_bytes = await image.read()
-    
-    try:
-        verified, score, confidence, time_taken = await face_service.verify_face(
-            student_id=student_id,
-            class_id=class_id,
-            image_bytes=image_bytes
-        )
-        
-        # Log this attempt to database
-        db = get_db()
-        log_data = {
-            "student_id": student_id,
-            "class_id": class_id,
-            "similarity_score": score,
-            "confidence": confidence,
-            "verified": verified,
-            "device_info": device_info,
-            "timestamp": datetime.utcnow()
-        }
-        await db["verification_logs"].insert_one(log_data)
-        
-        return VerifyResponse(
-            verified=verified,
-            similarityScore=score,
-            confidence=confidence,
-            verificationTime=time_taken,
-            message="Face matched and verified successfully." if verified else "Face match mismatch."
-        )
-    except ValueError as ve:
-        logger.warning(f"Verification ValueError: {ve}")
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        logger.error(f"Error during verification pipeline: {e}")
-        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
-
 @router.post("/start-liveness-session", response_model=LivenessSessionResponse)
 async def start_liveness_session(req: LivenessSessionRequest):
     """
@@ -159,6 +104,7 @@ async def verify_student_face_with_liveness(
     student_id: str = Form(...),
     class_id: str = Form(...),
     session_id: str = Form(...),
+    nonce: str = Form(...),
     images: List[UploadFile] = File(...),
     device_info: str = Form("Kiosk Mobile App")
 ):
@@ -185,6 +131,7 @@ async def verify_student_face_with_liveness(
             student_id=student_id,
             class_id=class_id,
             session_id=session_id,
+            nonce=nonce,
             frames_bytes=frames_bytes
         )
 

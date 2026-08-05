@@ -12,6 +12,7 @@ class FaceProcessState {
 
   // Liveness session data
   final String? sessionId;
+  final String? nonce;
   final List<String> challenges;
   final List<String> challengeDescriptions;
 
@@ -24,6 +25,7 @@ class FaceProcessState {
     this.confidenceScore = 0.0,
     this.error,
     this.sessionId,
+    this.nonce,
     this.challenges = const [],
     this.challengeDescriptions = const [],
   });
@@ -39,6 +41,7 @@ class FaceProcessState {
     double? confidenceScore,
     String? error,
     String? sessionId,
+    String? nonce,
     List<String>? challenges,
     List<String>? challengeDescriptions,
   }) {
@@ -51,6 +54,7 @@ class FaceProcessState {
       confidenceScore: confidenceScore ?? this.confidenceScore,
       error: error,
       sessionId: sessionId ?? this.sessionId,
+      nonce: nonce ?? this.nonce,
       challenges: challenges ?? this.challenges,
       challengeDescriptions: challengeDescriptions ?? this.challengeDescriptions,
     );
@@ -71,12 +75,14 @@ class FaceNotifier extends StateNotifier<FaceProcessState> {
     try {
       final res = await _faceRepo.startLivenessSession(studentId);
       final sessionId = res['session_id'] as String?;
+      final nonce = res['nonce'] as String?;
       final challenges = (res['challenges'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
       final descriptions = (res['challenge_descriptions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
 
       state = state.copyWith(
         isLoading: false,
         sessionId: sessionId,
+        nonce: nonce,
         challenges: challenges,
         challengeDescriptions: descriptions,
       );
@@ -94,6 +100,7 @@ class FaceNotifier extends StateNotifier<FaceProcessState> {
     required String studentId,
     required String classId,
     required String sessionId,
+    required String nonce,
     required List<List<int>> framesBytes,
     required String deviceInfo,
   }) async {
@@ -103,6 +110,7 @@ class FaceNotifier extends StateNotifier<FaceProcessState> {
         studentId: studentId,
         classId: classId,
         sessionId: sessionId,
+        nonce: nonce,
         framesBytes: framesBytes,
         deviceInfo: deviceInfo,
       );
@@ -118,36 +126,6 @@ class FaceNotifier extends StateNotifier<FaceProcessState> {
         error: verified ? null : (res['message'] ?? 'Verification failed'),
       );
       return verified;
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString().replaceAll('Exception: ', ''),
-      );
-      return false;
-    }
-  }
-
-  Future<bool> verifyFace({
-    required List<int> bytes,
-    required String studentId,
-    required String classId,
-    required String deviceInfo,
-  }) async {
-    state = state.copyWith(isLoading: true, error: null, verificationSuccess: null);
-    try {
-      final res = await _faceRepo.verifyFace(
-        imageBytes: bytes,
-        studentId: studentId,
-        classId: classId,
-        deviceInfo: deviceInfo,
-      );
-      state = state.copyWith(
-        isLoading: false,
-        verificationSuccess: res['verified'] ?? false,
-        similarityScore: (res['similarityScore'] as num?)?.toDouble() ?? 0.0,
-        confidenceScore: (res['confidence'] as num?)?.toDouble() ?? 0.0,
-      );
-      return res['verified'] ?? false;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,

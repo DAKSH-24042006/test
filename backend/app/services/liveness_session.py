@@ -147,7 +147,7 @@ class LivenessSessionManager:
         return session
 
     @classmethod
-    def validate_session(cls, session_id: str, student_id: str) -> Tuple[bool, str, Optional[LivenessSession]]:
+    def validate_session(cls, session_id: str, student_id: str, nonce: str) -> Tuple[bool, str, Optional[LivenessSession]]:
         """
         Validates a session for use.
         
@@ -165,6 +165,12 @@ class LivenessSessionManager:
                 f"but was submitted by {student_id}"
             )
             return False, "Session does not belong to this student.", None
+
+        if not secrets.compare_digest(session.nonce, nonce):
+            logger.warning(
+                f"Session {session_id[:8]}... nonce mismatch."
+            )
+            return False, "Invalid session nonce signature.", None
 
         if session.used:
             return False, "This liveness session has already been used. Please start a new scan.", None

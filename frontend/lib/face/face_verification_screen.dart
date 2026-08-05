@@ -36,8 +36,8 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
   Color _ovalColor = Colors.white;
   List<List<int>> _capturedFrames = [];
 
-  List<String> _challengeDescriptions = [];
   String? _sessionId;
+  String? _nonce;
 
   static const String _mockJpegBase64 = 
       '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCABkAGQBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
@@ -248,6 +248,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     }
 
     _sessionId = sessionRes['session_id'] as String?;
+    _nonce = sessionRes['nonce'] as String?;
 
     // Step 2: Seamless Passive Multi-Frame Burst Scan
     try {
@@ -328,6 +329,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       studentId: student.studentId,
       classId: clazz.classId,
       sessionId: _sessionId!,
+      nonce: _nonce ?? '',
       framesBytes: _capturedFrames,
       deviceInfo: deviceInfo,
     );
@@ -448,7 +450,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
               }
             },
           ),
-          actions: [
+          actions: kDebugMode ? [
             Switch(
               value: _simulatorMode,
               onChanged: (val) async {
@@ -467,7 +469,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
               padding: EdgeInsets.only(right: 8.0),
               child: Center(child: Text('Sim', style: TextStyle(fontSize: 12))),
             )
-          ],
+          ] : null,
         ),
         body: faceState.isLoading
             ? const Center(

@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days token validity for convenience
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-    FACE_SIMILARITY_THRESHOLD: float = 0.50  # ArcFace Cosine Similarity Threshold
+    FACE_SIMILARITY_THRESHOLD: float = 0.58  # ArcFace Cosine Similarity Threshold
     FACE_DETECTION_THRESHOLD: float = 0.55   # Face detection confidence threshold
 
     # Anti-Spoofing & Liveness Detection Settings

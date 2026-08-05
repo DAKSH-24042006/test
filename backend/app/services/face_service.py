@@ -239,6 +239,7 @@ class FaceService:
         student_id: str,
         class_id: str,
         session_id: str,
+        nonce: str,
         frames_bytes: List[bytes]
     ) -> Tuple[bool, bool, bool, float, float, float, str, Dict[str, Any]]:
         """
@@ -249,7 +250,7 @@ class FaceService:
         start_time = time.time()
 
         # 1. Session Validation
-        session_valid, session_err, session = LivenessSessionManager.validate_session(session_id, student_id)
+        session_valid, session_err, session = LivenessSessionManager.validate_session(session_id, student_id, nonce)
         if not session_valid:
             raise ValueError(session_err)
 
